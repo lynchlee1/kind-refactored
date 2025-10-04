@@ -36,7 +36,7 @@ class KINDScraper:
 
     def perform_search(self):
         buffertime = get("buffer_time")
-        # Using multiple selectors may be fail-safe, but it lacks performance and have problems with sending keys to wrong element.
+        # Using multiple selectors may be fail-safe, but it lacks performance and could send keys to wrong element.
         # Change to CSS key if XPATH returns error someday.
         try:
             reset_checkbox = self.driver.find_element(By.CSS_SELECTOR, get("reset_selector"))
@@ -98,7 +98,7 @@ class KINDScraper:
             search_button = self.driver.find_element(By.XPATH, get("search_button_selector"))
             self.driver.execute_script("arguments[0].click();", search_button)
             print("✅ 검색 성공")
-            time.sleep(get("long_loadtime"))
+            time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ 검색 실패: {e}")
 
     def click_and_capture_links(self, max_rows_limit=get("max_rows")):
@@ -119,6 +119,7 @@ class KINDScraper:
             send_progress_update(f"Processing report {i} of {total_rows}")
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
+                print(cells)
                 date_txt = cells[1].text.strip() if len(cells) >= 2 else ""
                 company_txt = cells[2].text.strip() if len(cells) >= 3 else ""
                 title_txt = cells[3].text.strip() if len(cells) >= 4 else row.text.strip()

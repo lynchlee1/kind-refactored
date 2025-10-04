@@ -16,13 +16,12 @@
     "to_date": "2025-09-30"
   },
   "timing": {
-    "buffer_time": 1,
-    "short_loadtime": 4,
-    "long_loadtime": 5,
+    "buffer_time": 0.5,
+    "short_loadtime": 2,
+    "long_loadtime": 3,
     "long_waitcount": 10,
     "short_waitcount": 10,
-    "implicit_wait": 10,
-    "page_load_timeout": 10,
+    "load_timeout": 10,
     "timeout": 1
   },
   "selectors": {
@@ -34,10 +33,9 @@
     "company_input_selector": "#AKCKwd",
     "from_date_selector": "input[name='fromDate']",
     "to_date_selector": "input[name='toDate']",
-    "next_page_selector": "a.paging_next",
+    "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
     "table_selector": "table, iframe",
-    "iframe_selector": [
-        "iframe[name='docViewFrm']"
-    ]
+    "iframe_selector": "iframe[name='docViewFrm']",
+    "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc"
   }
 }
