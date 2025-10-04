@@ -1,113 +1,162 @@
+"""
+Web driver management and utilities
+"""
+
 import time
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
-# Import configurable selectors
-try:
-    from settings import RESULT_ROW_SELECTOR, NEXT_PAGE_SELECTOR, TABLE_SELECTOR, IFRAME_SELECTOR
-except ImportError:
-    # Default selectors
-    RESULT_ROW_SELECTOR = "tr[onclick*='viewDetail']"
-    NEXT_PAGE_SELECTOR = "a.paging_next"
-    TABLE_SELECTOR = "table, iframe"
-    IFRAME_SELECTOR = "iframe[name='viewer']"
+from settings import get
 
-BUFFER = 0.5
-SHORT_LOADTIME = 2
-LONG_LOADTIME = 3
-
-# Can add/modify multiple selectors to be fail-safe.
-def find_result_rows(driver):
-    result_table_selectors = ["table.list.type-00", RESULT_ROW_SELECTOR]
-    rows = []
+def setup_driver(headless: bool = False) -> tuple[webdriver.Chrome, WebDriverWait]:
+    """Setup Chrome driver with optimized settings"""
+    chrome_options = Options()
+    if headless:
+        chrome_options.add_argument("--headless")
     
-    for selector in result_table_selectors:
-        try:
-            tables = driver.find_elements(By.CSS_SELECTOR, selector)
-            for table in tables:
-                table_location = table.location
-                # Prevent from selecting the table in the top of the page
-                if table_location['y'] > 300:
-                    rows = table.find_elements(By.CSS_SELECTOR, "tbody tr") or table.find_elements(By.TAG_NAME, "tr")
-                    print(f"{selector} used for find_result_rows")
-        except Exception:
-            continue
-    return rows
+    # Stability and crash prevention options
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-plugins")
+    chrome_options.add_argument("--disable-images")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-translate")
+    
+    # Memory and performance options
+    chrome_options.add_argument("--memory-pressure-off")
+    chrome_options.add_argument("--max_old_space_size=4096")
+    chrome_options.add_argument("--disable-background-networking")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    
+    # Logging and notifications
+    chrome_options.add_argument("--disable-notifications")
+    chrome_options.add_argument("--disable-logging")
+    chrome_options.add_argument("--log-level=3")
+    chrome_options.add_argument("--silent")
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Window and user agent
+    chrome_options.add_argument("--window-size=1600,1000")
+    chrome_options.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+    )
+    
+    # JavaScript is enabled by default
+    
+    try:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver.implicitly_wait(get("implicit_wait"))
+        driver.set_page_load_timeout(30)  # Add page load timeout
+        wait = WebDriverWait(driver, 20)
+        print("✅ Chrome driver setup successful")
+        return driver, wait
+    except Exception as e:
+        print(f"❌ Chrome driver setup failed: {e}")
+        raise
+
+def find_result_rows(driver):
+    """Find result rows in the search results table"""
+    result_selectors = get("result_row_selector")
+    
+    # Handle both string and array formats
+    if isinstance(result_selectors, str):
+        result_selectors = [result_selectors]
+    
+    for selector in result_selectors:
+        tables = driver.find_elements(By.CSS_SELECTOR, selector)
+        for table in tables:
+            table_location = table.location
+            # Prevent from selecting the table in the top of the page
+            if table_location['y'] > 300:
+                rows = table.find_elements(By.CSS_SELECTOR, "tbody tr") or table.find_elements(By.TAG_NAME, "tr")
+                print(f"✅ {selector} used for find_result_rows - found {len(rows)} rows")
+                return rows
+    return []
 
 def extract_from_iframe(driver, wait):
+    """Extract table data from iframe"""
+    iframe_selectors = get("iframe_selector")
+    
+    # Handle both string and array formats
+    if isinstance(iframe_selectors, str):
+        iframe_selectors = [iframe_selectors]
+    
+    iframe = None
+    for selector in iframe_selectors:
+        try:
+            iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+            print(f"✅ Found iframe with selector: {selector}")
+            break
+        except Exception:
+            continue
+    
+    if not iframe:
+        print("❌ No iframe found with given selectors")
+        return []    
+        
+    driver.switch_to.frame(iframe)
     try:
-        # Wait for iframe to load - try multiple selectors
-        print("⏳ Waiting for iframe...")
-        iframe_selectors = [
-            IFRAME_SELECTOR,
-            "iframe[name='docViewFrm']",
-            "iframe[name='viewer']", 
-            "iframe[name='content']",
-            "iframe",
-            "iframe[src*='viewer']",
-            "iframe[src*='doc']"
-        ]
-        
-        iframe = None
-        for selector in iframe_selectors:
-            try:
-                iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                print(f"✅ Found iframe with selector: {selector}")
-                break
-            except Exception:
-                continue
-        
-        if not iframe:
-            print("❌ No iframe found with any selector")
-            return []
-            
-        print("✅ Switching to iframe...")
-        driver.switch_to.frame(iframe)
-        
-        # Wait for content to load inside iframe
         print("⏳ Waiting for table content...")
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
         print("✅ Found table content")
         
         all_tables_data = []
         tables = driver.find_elements(By.TAG_NAME, "table")
-        print(f"📊 Found {len(tables)} tables in iframe")
-        
         for table_idx, table in enumerate(tables):
             rows = table.find_elements(By.TAG_NAME, "tr")
-            print(f"📋 Table {table_idx}: {len(rows)} rows")
-            
             if len(rows) > 0:
                 table_data = []
                 
-                # Extract all rows from this table
+                # Extract all rows from this table (optimized with JavaScript)
                 for row_idx, row in enumerate(rows):
                     cells = row.find_elements(By.TAG_NAME, "td")
                     if not cells: 
                         cells = row.find_elements(By.TAG_NAME, "th")
                     
                     if cells:
-                        row_data = [cell.text.strip() for cell in cells]
+                        # Use JavaScript for faster text extraction
+                        try:
+                            row_data = driver.execute_script("""
+                                var cells = arguments[0];
+                                var result = [];
+                                for (var i = 0; i < cells.length; i++) {
+                                    result.push(cells[i].textContent.trim());
+                                }
+                                return result;
+                            """, cells)
+                        except:
+                            # Fallback to Python extraction
+                            row_data = [cell.text.strip() for cell in cells]
+                        
                         # Only add non-empty rows
                         if any(cell.strip() for cell in row_data):
                             table_data.append({
                                 "row_index": row_idx,
                                 "data": row_data
                             })
-                            print(f"  Row {row_idx}: {row_data[:3]}...")  # Show first 3 cells
-                
-                # Only include tables with actual data
+
                 if table_data:
                     all_tables_data.append({
                         "table_index": table_idx,
                         "rows": table_data,
                         "row_count": len(table_data)
                     })
-                    print(f"✅ Table {table_idx} added with {len(table_data)} rows")
-                else:
-                    print(f"⚠️ Table {table_idx} has no data")
+                    print(f"✅ Table {table_idx}: {len(table_data)} rows extracted")
         
         print(f"📊 Total tables extracted from iframe: {len(all_tables_data)}")
         return all_tables_data
@@ -125,20 +174,8 @@ def extract_from_iframe(driver, wait):
     
     return []
 
-def extract_table_data(driver, wait):
-    print("🔍 Starting table data extraction...")
-    
-    # First try to extract from iframe
-    iframe_data = extract_from_iframe(driver, wait)
-    if iframe_data:
-        return iframe_data
-    
-    # If iframe fails, try direct extraction from main page
-    print("🔄 Iframe extraction failed, trying direct extraction...")
-    return extract_direct_tables(driver, wait)
-
-
 def extract_direct_tables(driver, wait):
+    """Extract table data directly from main page"""
     try:
         print("🔍 Extracting tables directly from main page...")
         
@@ -146,7 +183,8 @@ def extract_direct_tables(driver, wait):
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         
         all_tables_data = []
-        tables = driver.find_elements(By.CSS_SELECTOR, TABLE_SELECTOR)
+        table_selector = get("table_selector")
+        tables = driver.find_elements(By.CSS_SELECTOR, table_selector)
         print(f"📊 Found {len(tables)} tables on main page")
         
         for table_idx, table in enumerate(tables):
@@ -156,21 +194,33 @@ def extract_direct_tables(driver, wait):
             if len(rows) > 0:
                 table_data = []
                 
-                # Extract all rows from this table
+                # Extract all rows from this table (optimized with JavaScript)
                 for row_idx, row in enumerate(rows):
                     cells = row.find_elements(By.TAG_NAME, "td")
                     if not cells: 
                         cells = row.find_elements(By.TAG_NAME, "th")
                     
                     if cells:
-                        row_data = [cell.text.strip() for cell in cells]
+                        # Use JavaScript for faster text extraction
+                        try:
+                            row_data = driver.execute_script("""
+                                var cells = arguments[0];
+                                var result = [];
+                                for (var i = 0; i < cells.length; i++) {
+                                    result.push(cells[i].textContent.trim());
+                                }
+                                return result;
+                            """, cells)
+                        except:
+                            # Fallback to Python extraction
+                            row_data = [cell.text.strip() for cell in cells]
+                        
                         # Only add non-empty rows
                         if any(cell.strip() for cell in row_data):
                             table_data.append({
                                 "row_index": row_idx,
                                 "data": row_data
                             })
-                            print(f"  Row {row_idx}: {row_data[:3]}...")  # Show first 3 cells
                 
                 # Only include tables with actual data
                 if table_data:
@@ -179,7 +229,7 @@ def extract_direct_tables(driver, wait):
                         "rows": table_data,
                         "row_count": len(table_data)
                     })
-                    print(f"✅ Table {table_idx} added with {len(table_data)} rows")
+                    print(f"✅ Table {table_idx}: {len(table_data)} rows extracted")
                 else:
                     print(f"⚠️ Table {table_idx} has no data")
         
@@ -193,13 +243,28 @@ def extract_direct_tables(driver, wait):
     
     return []
 
+def extract_table_data(driver, wait):
+    """Extract table data from iframe or main page"""
+    print("🔍 Starting table data extraction...")
+    
+    # First try to extract from iframe
+    iframe_data = extract_from_iframe(driver, wait)
+    if iframe_data:
+        return iframe_data
+    
+    # If iframe fails, try direct extraction from main page
+    print("🔄 Iframe extraction failed, trying direct extraction...")
+    return extract_direct_tables(driver, wait)
+
 def click_next_page(driver, wait):
+    """Click next page button and verify page change"""
     try:
         print("🔍 Attempting to click next page...")
         
         # Check if next button exists and is clickable
+        next_page_selector = get("next_page_selector")
         next_button_selectors = [
-            NEXT_PAGE_SELECTOR,
+            next_page_selector,
             "#main-contents > section.paging-group > div.paging.type-00 > a.next",
             "a.next",
             ".paging a.next",

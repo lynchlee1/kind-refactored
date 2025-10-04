@@ -1,3 +1,7 @@
+"""
+Web-based user interface module
+"""
+
 from flask import Flask, render_template_string, request, jsonify, send_from_directory
 import webbrowser
 import threading
@@ -247,54 +251,6 @@ HTML_TEMPLATE = '''
             color: #6c757d;
         }
         
-        .dev-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .dev-item {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .dev-item .form-label {
-            font-size: 12px;
-            margin-bottom: 5px;
-        }
-        
-        .dev-item .form-input {
-            padding: 10px;
-            font-size: 14px;
-        }
-        
-        .dev-locked {
-            opacity: 0.5;
-            pointer-events: none;
-            background: #f5f5f5 !important;
-            color: #999 !important;
-        }
-        
-        .dev-unlocked {
-            opacity: 1;
-            pointer-events: auto;
-            background: white !important;
-            color: #2c3e50 !important;
-        }
-        
-        .password-error {
-            color: #dc3545;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-        
-        .password-success {
-            color: #28a745;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-        
         .spinner {
             border: 3px solid #f3f3f3;
             border-top: 3px solid #007bff;
@@ -354,109 +310,6 @@ HTML_TEMPLATE = '''
                 <label for="headless" class="checkbox-label">Run in background (headless mode)</label>
             </div>
             
-            <div class="checkbox-group">
-                <input type="checkbox" id="devMode" name="devMode" class="checkbox">
-                <label for="devMode" class="checkbox-label">Developer Mode (show advanced settings)</label>
-            </div>
-            
-            <div class="checkbox-group">
-                <input type="checkbox" id="debugMode" name="debugMode" class="checkbox">
-                <label for="debugMode" class="checkbox-label">Debug Mode (show all development prints)</label>
-            </div>
-            
-            <div id="devSettings" style="display: none;">
-                <div class="form-group">
-                    <label class="form-label">Developer Settings</label>
-                    <div class="dev-grid">
-                        <div class="dev-item">
-                            <label class="form-label" for="bufferTime">Buffer Time (seconds)</label>
-                            <input type="number" id="bufferTime" name="bufferTime" class="form-input" 
-                                   value="1.0" step="0.1" min="0.1" max="10">
-                        </div>
-                        <div class="dev-item">
-                            <label class="form-label" for="lightLoading">Light Loading Time (seconds)</label>
-                            <input type="number" id="lightLoading" name="lightLoading" class="form-input" 
-                                   value="2.0" step="0.1" min="0.5" max="10">
-                        </div>
-                        <div class="dev-item">
-                            <label class="form-label" for="heavyLoading">Heavy Loading Time (seconds)</label>
-                            <input type="number" id="heavyLoading" name="heavyLoading" class="form-input" 
-                                   value="5.0" step="0.1" min="1" max="20">
-                        </div>
-                        <div class="dev-item">
-                            <label class="form-label" for="contentLoadWait">Content Load Wait (seconds)</label>
-                            <input type="number" id="contentLoadWait" name="contentLoadWait" class="form-input" 
-                                   value="3.0" step="0.1" min="0.5" max="10">
-                        </div>
-                        <div class="dev-item">
-                            <label class="form-label" for="maxWaitIter">Max Wait Iterations</label>
-                            <input type="number" id="maxWaitIter" name="maxWaitIter" class="form-input" 
-                                   value="30" min="5" max="100">
-                        </div>
-                        <div class="dev-item">
-                            <label class="form-label" for="urlSettleIter">URL Settle Iterations</label>
-                            <input type="number" id="urlSettleIter" name="urlSettleIter" class="form-input" 
-                                   value="20" min="5" max="50">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group" style="margin-top: 20px;">
-                        <label class="form-label">CSS Selectors</label>
-                        <div style="display: flex; gap: 10px; align-items: end; margin-bottom: 15px;">
-                            <div style="flex: 1;">
-                                <input type="password" id="devPassword" name="devPassword" class="form-input" 
-                                       placeholder="Enter admin password" style="background: #f5f5f5; color: #999; padding: 6px 10px; font-size: 12px;">
-                            </div>
-                            <button type="button" id="unlockDev" class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">
-                                Unlock
-                            </button>
-                        </div>
-                        <div class="dev-grid">
-                            <div class="dev-item">
-                                <label class="form-label" for="searchButtonSelector">Search Button Selector</label>
-                                <input type="text" id="searchButtonSelector" name="searchButtonSelector" class="form-input" 
-                                       value="button[type='submit']">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="resultRowSelector">Result Row Selector</label>
-                                <input type="text" id="resultRowSelector" name="resultRowSelector" class="form-input" 
-                                       value="tr[onclick*='viewDetail']">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="companyInputSelector">Company Input Selector</label>
-                                <input type="text" id="companyInputSelector" name="companyInputSelector" class="form-input" 
-                                       value="input[name='companyName']">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="fromDateSelector">From Date Selector</label>
-                                <input type="text" id="fromDateSelector" name="fromDateSelector" class="form-input" 
-                                       value="input[name='fromDate']">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="toDateSelector">To Date Selector</label>
-                                <input type="text" id="toDateSelector" name="toDateSelector" class="form-input" 
-                                       value="input[name='toDate']">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="nextPageSelector">Next Page Selector</label>
-                                <input type="text" id="nextPageSelector" name="nextPageSelector" class="form-input" 
-                                       value="a.paging_next">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="tableSelector">Table Selector</label>
-                                <input type="text" id="tableSelector" name="tableSelector" class="form-input" 
-                                       value="table, iframe">
-                            </div>
-                            <div class="dev-item">
-                                <label class="form-label" for="iframeSelector">Iframe Selector</label>
-                                <input type="text" id="iframeSelector" name="iframeSelector" class="form-input" 
-                                       value="iframe[name='viewer']">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <div class="button-group">
                 <button type="button" class="btn btn-secondary" onclick="cancel()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Start Scraping</button>
@@ -480,109 +333,6 @@ HTML_TEMPLATE = '''
     </div>
     
     <script>
-        // Developer mode password protection
-        const DEV_PASSWORD = 'admin';
-        let devUnlocked = false;
-        
-        // Toggle developer settings visibility
-        document.getElementById('devMode').addEventListener('change', function() {
-            const devSettings = document.getElementById('devSettings');
-            
-            if (this.checked) {
-                // Show all developer settings immediately
-                devSettings.style.display = 'block';
-                // Only lock CSS selector inputs
-                lockDeveloperSettings();
-            } else {
-                devSettings.style.display = 'none';
-                devUnlocked = false;
-            }
-        });
-        
-        // Unlock CSS selectors
-        document.getElementById('unlockDev').addEventListener('click', function() {
-            const password = document.getElementById('devPassword').value;
-            
-            if (password === DEV_PASSWORD) {
-                devUnlocked = true;
-                unlockDeveloperSettings();
-                showPasswordMessage('CSS selectors unlocked!', 'success');
-            } else {
-                showPasswordMessage('Invalid password!', 'error');
-            }
-        });
-        
-        function lockDeveloperSettings() {
-            // Only lock CSS selector inputs
-            const selectorInputs = document.querySelectorAll('#devSettings input[id*="Selector"]');
-            selectorInputs.forEach(input => {
-                input.classList.add('dev-locked');
-                input.disabled = true;
-            });
-        }
-        
-        function unlockDeveloperSettings() {
-            // Only unlock CSS selector inputs
-            const selectorInputs = document.querySelectorAll('#devSettings input[id*="Selector"]');
-            selectorInputs.forEach(input => {
-                input.classList.remove('dev-locked');
-                input.classList.add('dev-unlocked');
-                input.disabled = false;
-            });
-        }
-        
-        function showPasswordMessage(message, type) {
-            // Remove existing message
-            const existingMsg = document.getElementById('passwordError');
-            if (existingMsg) {
-                existingMsg.remove();
-            }
-            
-            // Create new message
-            const msgDiv = document.createElement('div');
-            msgDiv.id = 'passwordError';
-            msgDiv.className = type === 'error' ? 'password-error' : 'password-success';
-            msgDiv.textContent = message;
-            
-            // Insert after password input
-            const passwordInput = document.getElementById('devPassword');
-            passwordInput.parentNode.appendChild(msgDiv);
-            
-            // Auto-hide success message
-            if (type === 'success') {
-                setTimeout(() => {
-                    if (msgDiv.parentNode) {
-                        msgDiv.remove();
-                    }
-                }, 3000);
-            }
-        }
-        
-        // Load existing developer settings
-        fetch('/dev-settings')
-        .then(response => response.json())
-        .then(settings => {
-            if (settings.success) {
-                document.getElementById('bufferTime').value = settings.data.buffer_time;
-                document.getElementById('lightLoading').value = settings.data.SHORT_LOADTIME;
-                document.getElementById('heavyLoading').value = settings.data.LONG_LOADTIME;
-                document.getElementById('contentLoadWait').value = settings.data.LONG_LOADTIME;
-                document.getElementById('maxWaitIter').value = settings.data.LONG_WAITCOUNT;
-                document.getElementById('urlSettleIter').value = settings.data.SHORT_WAITCOUNT;
-                
-                // Load CSS selectors
-                document.getElementById('searchButtonSelector').value = settings.data.search_button_selector || "button[type='submit']";
-                document.getElementById('resultRowSelector').value = settings.data.result_row_selector || "tr[onclick*='viewDetail']";
-                document.getElementById('companyInputSelector').value = settings.data.company_input_selector || "input[name='companyName']";
-                document.getElementById('fromDateSelector').value = settings.data.from_date_selector || "input[name='fromDate']";
-                document.getElementById('toDateSelector').value = settings.data.to_date_selector || "input[name='toDate']";
-                document.getElementById('nextPageSelector').value = settings.data.next_page_selector || "a.paging_next";
-                document.getElementById('tableSelector').value = settings.data.table_selector || "table, iframe";
-                document.getElementById('iframeSelector').value = settings.data.iframe_selector || "iframe[name='viewer']";
-            }
-        })
-        .catch(error => console.log('Could not load dev settings:', error));
-        
         document.getElementById('configForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -592,26 +342,7 @@ HTML_TEMPLATE = '''
                 from_date: formData.get('fromDate'),
                 to_date: formData.get('toDate'),
                 max_rows: parseInt(formData.get('maxRows')),
-                headless: formData.has('headless'),
-                dev_mode: formData.has('devMode'),
-                debug_mode: formData.has('debugMode'),
-                dev_settings: {
-                    buffer_time: parseFloat(formData.get('bufferTime')),
-                    SHORT_LOADTIME: parseFloat(formData.get('lightLoading')),
-                    LONG_LOADTIME: parseFloat(formData.get('heavyLoading')),
-                    LONG_LOADTIME: parseFloat(formData.get('contentLoadWait')),
-                    LONG_WAITCOUNT: parseInt(formData.get('maxWaitIter')),
-                    SHORT_WAITCOUNT: parseInt(formData.get('urlSettleIter')),
-                    // CSS Selectors - only save if unlocked
-                    search_button_selector: devUnlocked ? formData.get('searchButtonSelector') : undefined,
-                    result_row_selector: devUnlocked ? formData.get('resultRowSelector') : undefined,
-                    company_input_selector: devUnlocked ? formData.get('companyInputSelector') : undefined,
-                    from_date_selector: devUnlocked ? formData.get('fromDateSelector') : undefined,
-                    to_date_selector: devUnlocked ? formData.get('toDateSelector') : undefined,
-                    next_page_selector: devUnlocked ? formData.get('nextPageSelector') : undefined,
-                    table_selector: devUnlocked ? formData.get('tableSelector') : undefined,
-                    iframe_selector: devUnlocked ? formData.get('iframeSelector') : undefined
-                }
+                headless: formData.has('headless')
             };
             
             // Validate dates
@@ -678,15 +409,15 @@ HTML_TEMPLATE = '''
             let progress = 0;
             let currentStep = 0;
             const steps = [
-                { text: "Connecting to KIND website...", progress: 10 },
-                { text: "Navigating to search page...", progress: 20 },
-                { text: "Entering company name: 에스티팜...", progress: 30 },
-                { text: "Setting date range...", progress: 40 },
-                { text: "Clicking search button...", progress: 50 },
-                { text: "Loading search results...", progress: 60 },
-                { text: "Finding result rows...", progress: 70 },
-                { text: "Extracting data from reports...", progress: 80 },
-                { text: "Processing extracted data...", progress: 90 },
+                { text: "Connecting to KIND website...", progress: 0 },
+                { text: "Navigating to search page...", progress: 0 },
+                { text: "Entering company name: 에스티팜...", progress: 0 },
+                { text: "Setting date range...", progress: 0 },
+                { text: "Clicking search button...", progress: 0 },
+                { text: "Loading search results...", progress: 0 },
+                { text: "Finding result rows...", progress: 0 },
+                { text: "Extracting data from reports...", progress: 0 },
+                { text: "Processing extracted data...", progress: 95 },
                 { text: "Finalizing and saving results...", progress: 100 }
             ];
             
@@ -790,11 +521,15 @@ def find_available_port(start_port=5000):
 
 @app.route('/')
 def index():
+    print("🔍 Serving updated HTML template with debug mode checkbox")
     return render_template_string(HTML_TEMPLATE)
 
 @app.route('/logo.jpg')
 def logo():
-    return send_from_directory('.', 'logo.jpg')
+    import os
+    # Get the directory where this script is located (project root)
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_from_directory(current_dir, 'logo.jpg')
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -809,14 +544,6 @@ def submit():
         if data.get('max_rows', 0) <= 0:
             return jsonify({'success': False, 'message': 'Max rows must be greater than 0'})
         
-        # Save developer settings if dev mode is enabled
-        if data.get('dev_mode') and data.get('dev_settings'):
-            try:
-                from settings import save_dev_settings
-                save_dev_settings(data['dev_settings'])
-            except Exception as e:
-                print(f"Warning: Could not save dev settings: {e}")
-        
         result_data = data
         return jsonify({'success': True})
         
@@ -829,27 +556,6 @@ def cancel():
     result_data = None
     return jsonify({'success': True})
 
-@app.route('/dev-settings', methods=['GET'])
-def get_dev_settings():
-    try:
-        from settings import load_dev_settings
-        settings = load_dev_settings()
-        return jsonify({'success': True, 'data': settings})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/dev-settings', methods=['POST'])
-def save_dev_settings():
-    try:
-        from settings import save_dev_settings
-        data = request.get_json()
-        if save_dev_settings(data):
-            return jsonify({'success': True})
-        else:
-            return jsonify({'success': False, 'message': 'Failed to save settings'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
 @app.route('/progress', methods=['POST'])
 def update_progress():
     """Endpoint to receive progress updates from the scraper"""
@@ -861,7 +567,7 @@ def update_progress():
         first_report_number = data.get('first_report_number')
         completed = data.get('completed', False)
         
-        # Store progress data globally (could be enhanced with WebSocket for real-time updates)
+        # Store progress data globally
         global progress_data
         progress_data = {
             'current_report': current_report,
@@ -889,6 +595,9 @@ def start_server():
     server_running = True
     current_port = find_available_port()
     print(f"🌐 Starting server on port {current_port}")
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
     app.run(host='127.0.0.1', port=current_port, debug=False, use_reloader=False)
 
 def get_user_input():

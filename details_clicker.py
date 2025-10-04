@@ -43,15 +43,18 @@ headless_mode = False
 debug_mode = False
 
 try:
-    from dev_config import (LIGHT_LOADING_TIME, HEAVY_LOADING_TIME, BUFFER_TIME, MAX_WAIT_ITERATIONS, 
-                           URL_SETTLE_ITERATIONS, CONTENT_LOAD_WAIT, SEARCH_BUTTON_SELECTOR, 
+    from settings import (SHORT_LOADTIME, LONG_LOADTIME, BUFFER_TIME, LONG_WAITCOUNT, 
+                           SHORT_WAITCOUNT, SEARCH_BUTTON_SELECTOR, 
                            RESULT_ROW_SELECTOR, COMPANY_INPUT_SELECTOR, FROM_DATE_SELECTOR, 
                            TO_DATE_SELECTOR, NEXT_PAGE_SELECTOR, TABLE_SELECTOR, IFRAME_SELECTOR)
 except ImportError:
-    from config import LIGHT_LOADING_TIME, HEAVY_LOADING_TIME, BUFFER_TIME
-    MAX_WAIT_ITERATIONS = 30
-    URL_SETTLE_ITERATIONS = 20
-    CONTENT_LOAD_WAIT = 3.0
+    # Fallback values if settings not available
+    SHORT_LOADTIME = 0.5
+    LONG_LOADTIME = 1.0
+    BUFFER_TIME = 0.05
+    LONG_WAITCOUNT = 30
+    SHORT_WAITCOUNT = 20
+    LONG_LOADTIME = 3.0
     # Default selectors
     SEARCH_BUTTON_SELECTOR = "button[type='submit']"
     RESULT_ROW_SELECTOR = "tr[onclick*='viewDetail']"
@@ -359,7 +362,7 @@ def process_all_pages(driver, wait):
 
 def perform_search(driver: webdriver.Chrome, wait: WebDriverWait):
     send_progress_update(0, 100, "Initializing search...")
-    time.sleep(LIGHT_LOADING_TIME)
+    time.sleep(SHORT_LOADTIME)
     try:
         init_checkbox = driver.find_element(By.CSS_SELECTOR, "#bfrDsclsType")
         if init_checkbox.is_selected():
@@ -441,7 +444,7 @@ def perform_search(driver: webdriver.Chrome, wait: WebDriverWait):
         driver.execute_script("arguments[0].click();", search_button)
         print("✅ 검색 성공")
         send_progress_update(30, 100, "Searching for results...")
-        time.sleep(HEAVY_LOADING_TIME)  # Wait for search results to load
+        time.sleep(LONG_LOADTIME)  # Wait for search results to load
 
     except Exception:
         try:
@@ -450,7 +453,7 @@ def perform_search(driver: webdriver.Chrome, wait: WebDriverWait):
             search_button = driver.find_element(By.XPATH, xpath_selector)
             driver.execute_script("arguments[0].click();", search_button)
             print("✅ 검색 성공")
-            time.sleep(HEAVY_LOADING_TIME)
+            time.sleep(LONG_LOADTIME)
         except Exception as e:
             print(f"❌ 검색 실패: {e}")
 
