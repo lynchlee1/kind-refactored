@@ -115,8 +115,7 @@ class KINDScraper:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 if len(cells) >= 1: first_report_number = cells[0].text.strip()      
 
-            # Send progress update every 5 reports or on the last report
-            if (i + 1) % 5 == 0 or (i + 1) == total_rows:
+            if i < total_rows:
                 send_report_progress(i + 1, total_rows)
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
