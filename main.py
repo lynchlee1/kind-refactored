@@ -12,31 +12,29 @@ def main():
             company_name=user_input['company_name'],
             from_date=user_input['from_date'],
             to_date=user_input['to_date'],
-            max_rows=user_input['max_rows'],
-            headless=user_input['headless'],
-            debug_mode=user_input.get('debug_mode', False)
+            headless=user_input['headless']
         )
         items = scraper.run()
         
         if items:
-            send_progress_update(message="Processing data and saving to Excel...")
+            send_progress_update(percentage=90)
             if process_data_to_excel(): 
                 print("✅ Data processing completed!")
-                send_completion("Data processing completed successfully!")
-                set_scraping_completed(True)  # Signal completion to web interface
+                send_completion()
+                set_scraping_completed(True)
             else: 
                 print("❌ Data processing failed!")
-                send_completion("Data processing failed!")
-                set_scraping_completed(True)  # Signal completion even on failure
+                send_completion()
+                set_scraping_completed(True)
         else:
-            print("⚠️ No items found to process")
-            send_completion("No items found to process")
-            set_scraping_completed(True)  # Signal completion even with no items
+            print("❌ No items found to process")
+            send_completion()
+            set_scraping_completed(True)
     
     except Exception as e: 
-        print(f"❌ Error: {e}")
-        send_completion(f"Scraping failed: {e}")
-        set_scraping_completed(True)  # Signal completion even on error
+        print(f"❌ Scraping failed: {e}")
+        send_completion()
+        set_scraping_completed(True)
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     main()

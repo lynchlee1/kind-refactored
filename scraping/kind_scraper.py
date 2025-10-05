@@ -14,17 +14,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from settings import get
 
 from modules.driver_manager import setup_driver, find_result_rows, extract_table_data, click_next_page
-from modules.progress_tracker import send_progress_update, send_page_progress, send_report_progress, send_completion
+from modules.progress_tracker import send_progress_update, send_report_progress, send_completion
 
 
 class KINDScraper:
-    def __init__(self, company_name=None, from_date=None, to_date=None, max_rows=None, headless=False, debug_mode=False):
+    def __init__(self, company_name=None, from_date=None, to_date=None, headless=False):
         self.company_name = company_name or get("company_name")
         self.from_date = from_date or get("from_date")
         self.to_date = to_date or get("to_date")
-        self.max_rows = max_rows or get("max_rows")
         self.headless = headless
-        self.debug_mode = debug_mode
         
         self.driver = None
         self.wait = None
@@ -102,27 +100,26 @@ class KINDScraper:
             time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ 검색 실패: {e}")
 
-    def click_and_capture_links(self, max_rows_limit=get("max_rows")):
+    def click_and_capture_links(self):
         buffertime = get("buffer_time")
         results = []
         rows = find_result_rows(self.driver)
         if not rows: return results # When no return is found
 
         base_handle = self.driver.current_window_handle
-        total_rows = len(rows[:max_rows_limit])
+        total_rows = len(rows)
         first_report_number = None
         
-        for i, row in enumerate(rows[:max_rows_limit], start=1):
+        for i, row in enumerate(rows, start=1):
             if i == 1:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 if len(cells) >= 1: first_report_number = cells[0].text.strip()      
 
             # Send progress update every 5 reports or on the last report
             if (i + 1) % 5 == 0 or (i + 1) == total_rows:
-                send_report_progress(i + 1, total_rows, f"Processing report {i + 1} of {total_rows}")
+                send_report_progress(i + 1, total_rows)
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
-                print(cells)
                 date_txt = cells[1].text.strip() if len(cells) >= 2 else ""
                 company_txt = cells[2].text.strip() if len(cells) >= 3 else ""
                 title_txt = cells[3].text.strip() if len(cells) >= 4 else row.text.strip()
@@ -226,9 +223,7 @@ class KINDScraper:
         
         while True:
             print(f"📄 Processing page {page_num}...")
-            # Send page progress update
-            send_page_progress(page_num)
-            page_results = self.click_and_capture_links(self.max_rows)
+            page_results = self.click_and_capture_links()
             all_results.extend(page_results)
             print(f"✅ Found {len(page_results)} relevant results on page {page_num}")
             if not click_next_page(self.driver, self.wait): 
@@ -244,8 +239,6 @@ class KINDScraper:
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             self.perform_search()
             items = self.process_all_pages()
-            print("💾 Saving results...")
-            send_progress_update(message="Saving results to JSON file...")
             
             # Save results to JSON
             output_file = get("output_json_file")

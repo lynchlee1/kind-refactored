@@ -9,6 +9,9 @@ import time
 import sys
 import os
 import socket
+import threading
+import time
+from settings import get
 
 app = Flask(__name__)
 
@@ -210,7 +213,7 @@ HTML_TEMPLATE = '''
             margin-top: 20px;
         }
         
-        .progress-display {
+        .progress-container {
             display: none;
             margin-top: 20px;
             padding: 20px;
@@ -219,17 +222,76 @@ HTML_TEMPLATE = '''
             border: 1px solid #e9ecef;
         }
         
-        .progress-status {
-            font-size: 16px;
-            font-weight: 600;
-            color: #007bff;
-            margin-bottom: 8px;
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
         }
         
-        .progress-text {
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-percentage {
+            text-align: center;
             font-size: 14px;
+            font-weight: 600;
+            color: #007bff;
+        }
+        
+        .dev-mode-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .dev-settings {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .dev-setting-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .dev-setting-group h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .dev-setting-item {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .dev-setting-label {
+            font-size: 12px;
             color: #6c757d;
-            line-height: 1.4;
+            font-weight: 500;
+        }
+        
+        .dev-setting-input {
+            padding: 8px;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 12px;
         }
         
         
@@ -263,7 +325,7 @@ HTML_TEMPLATE = '''
             <div class="form-group">
                 <label class="form-label" for="company">Company Name</label>
                 <input type="text" id="company" name="company" class="form-input" 
-                       value="에스티팜" required>
+                       value="" required>
             </div>
             
             <div class="form-group">
@@ -281,11 +343,6 @@ HTML_TEMPLATE = '''
                 </div>
             </div>
             
-            <div class="form-group">
-                <label class="form-label" for="maxRows">Maximum Rows per Page</label>
-                <input type="number" id="maxRows" name="maxRows" class="form-input" 
-                       value="200" min="1" max="1000" required>
-            </div>
             
             <div class="checkbox-group">
                 <input type="checkbox" id="headless" name="headless" class="checkbox">
@@ -294,17 +351,27 @@ HTML_TEMPLATE = '''
             
             <div class="button-group">
                 <button type="button" class="btn btn-secondary" onclick="cancel()">Cancel</button>
+                <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">Developer Mode</button>
                 <button type="submit" class="btn btn-primary">Start Scraping</button>
             </div>
             
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Starting web scraping...</p>
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-percentage" id="progressPercentage">0%</div>
             </div>
             
-            <div class="progress-display" id="progressDisplay" style="display: none;">
-                <div class="progress-status" id="progressStatus">Initializing...</div>
-                <div class="progress-text" id="progressText">Connecting to KIND website...</div>
+            <div class="dev-mode-container" id="devModeContainer" style="display: none;">
+                <h3 style="margin-bottom: 20px; color: #2c3e50;">Developer Settings</h3>
+                <div class="dev-settings" id="devSettings">
+                    <!-- Developer settings will be loaded here -->
+                </div>
+                <div class="button-group" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="saveDevSettings()">Save Settings</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetDevSettings()">Reset to Default</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">Close</button>
+                </div>
             </div>
             
             <div class="status" id="status"></div>
@@ -320,7 +387,6 @@ HTML_TEMPLATE = '''
                 company_name: formData.get('company'),
                 from_date: formData.get('fromDate'),
                 to_date: formData.get('toDate'),
-                max_rows: parseInt(formData.get('maxRows')),
                 headless: formData.has('headless')
             };
             
@@ -333,18 +399,11 @@ HTML_TEMPLATE = '''
                 return;
             }
             
-            // Show progress display
-            document.querySelector('.loading').style.display = 'none';
-            document.querySelector('.progress-display').style.display = 'block';
+            document.querySelector('.progress-container').style.display = 'block';
             document.querySelector('.button-group').style.display = 'none';
             
-            // Start progress simulation
-            startProgressSimulation();
-            
-            // Start checking for completion
             checkForCompletion();
             
-            // Send data to server
             fetch('/submit', {
                 method: 'POST',
                 headers: {
@@ -355,18 +414,15 @@ HTML_TEMPLATE = '''
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    // Keep window open - don't close automatically
                 } else {
                     showStatus('Error: ' + result.message, 'error');
-                    document.querySelector('.loading').style.display = 'none';
-                    document.querySelector('.progress-display').style.display = 'none';
+                    document.querySelector('.progress-container').style.display = 'none';
                     document.querySelector('.button-group').style.display = 'flex';
                 }
             })
             .catch(error => {
                 showStatus('Error: ' + error.message, 'error');
-                document.querySelector('.loading').style.display = 'none';
-                document.querySelector('.progress-display').style.display = 'none';
+                document.querySelector('.progress-container').style.display = 'none';
                 document.querySelector('.button-group').style.display = 'flex';
             });
         });
@@ -374,7 +430,6 @@ HTML_TEMPLATE = '''
         function cancel() {
             fetch('/cancel', { method: 'POST' })
             .then(() => {
-                // Keep window open - let user close manually
                 showStatus('Operation cancelled', 'error');
             });
         }
@@ -386,44 +441,170 @@ HTML_TEMPLATE = '''
             status.style.display = 'block';
         }
         
-        function startProgressSimulation() {
-            const steps = [
-                { status: "Initializing...", text: "Setting up web driver..." },
-                { status: "Connecting...", text: "Navigating to KIND website..." },
-                { status: "Searching...", text: "Entering company name and date range..." },
-                { status: "Loading...", text: "Clicking search button and loading results..." },
-                { status: "Processing...", text: "Finding and extracting data from reports..." },
-                { status: "Saving...", text: "Processing extracted data and saving to Excel..." }
-            ];
+        function updateProgressBar(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            const progressPercentage = document.getElementById('progressPercentage');
             
-            let currentStep = 0;
-            
-            function updateProgress() {
-                if (currentStep < steps.length) {
-                    const step = steps[currentStep];
-                    document.getElementById('progressStatus').textContent = step.status;
-                    document.getElementById('progressText').textContent = step.text;
-                    currentStep++;
-                    
-                    // Simulate processing time - faster steps for better UX
-                    const delay = currentStep <= 3 ? 2000 : 3000;
-                    setTimeout(updateProgress, delay);
-                } else {
-                    // Keep showing "Processing..." until actual completion
-                    document.getElementById('progressStatus').textContent = "Processing...";
-                    document.getElementById('progressText').textContent = "Please wait while the scraping process completes. This may take several minutes depending on the number of reports.";
-                    
-                    // Continue showing processing status every 10 seconds
-                    setTimeout(updateProgress, 10000);
-                }
+            progressFill.style.width = percentage + '%';
+            progressPercentage.textContent = Math.round(percentage) + '%';
+        }
+        
+        function toggleDevMode() {
+            const container = document.getElementById('devModeContainer');
+            if (container.style.display === 'none') {
+                loadDevSettings();
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
             }
+        }
+        
+        function loadDevSettings() {
+            fetch('/dev-settings')
+            .then(response => response.json())
+            .then(data => {
+                const settingsContainer = document.getElementById('devSettings');
+                settingsContainer.innerHTML = '';
+                
+                // Only show timing and selectors sections
+                const allowedSections = ['timing', 'selectors'];
+                
+                Object.entries(data).forEach(([section, settings]) => {
+                    if (allowedSections.includes(section)) {
+                        const groupDiv = document.createElement('div');
+                        groupDiv.className = 'dev-setting-group';
+                        
+                        const title = document.createElement('h4');
+                        title.textContent = section.charAt(0).toUpperCase() + section.slice(1);
+                        groupDiv.appendChild(title);
+                        
+                        // Sort settings by characteristic groups
+                        const sortedEntries = Object.entries(settings).sort(([keyA], [keyB]) => {
+                            // Define characteristic groups for better organization
+                            const groups = {
+                                'time': ['buffer_time', 'short_loadtime', 'long_loadtime', 'load_timeout', 'timeout'],
+                                'wait': ['short_waitcount', 'long_waitcount'],
+                                'date': ['from_date_selector', 'to_date_selector'],
+                                'form': ['reset_selector', 'company_input_selector'],
+                                'navigation': ['market_measures_selector', 'new_stock_selector', 'search_button_selector', 'next_page_selector'],
+                                'content': ['result_row_selector', 'table_selector', 'iframe_selector', 'first_idx_selector']
+                            };
+                            
+                            // Find group index for each key
+                            const getGroupIndex = (key) => {
+                                for (const [groupName, keys] of Object.entries(groups)) {
+                                    if (keys.includes(key)) return Object.keys(groups).indexOf(groupName);
+                                }
+                                return 999; // Unknown keys go to end
+                            };
+                            
+                            const groupIndexA = getGroupIndex(keyA);
+                            const groupIndexB = getGroupIndex(keyB);
+                            
+                            // First sort by group, then alphabetically within group
+                            if (groupIndexA !== groupIndexB) {
+                                return groupIndexA - groupIndexB;
+                            }
+                            return keyA.localeCompare(keyB);
+                        });
+                        
+                        sortedEntries.forEach(([key, value]) => {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'dev-setting-item';
+                            
+                            const label = document.createElement('div');
+                            label.className = 'dev-setting-label';
+                            label.textContent = key;
+                            
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.className = 'dev-setting-input';
+                            input.value = value;
+                            input.dataset.section = section;
+                            input.dataset.key = key;
+                            
+                            itemDiv.appendChild(label);
+                            itemDiv.appendChild(input);
+                            groupDiv.appendChild(itemDiv);
+                        });
+                        
+                        settingsContainer.appendChild(groupDiv);
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading dev settings:', error);
+                showStatus('Error loading developer settings', 'error');
+            });
+        }
+        
+        function saveDevSettings() {
+            const inputs = document.querySelectorAll('.dev-setting-input');
+            const settings = {};
             
-            updateProgress();
+            // Get current full settings to preserve unchanged sections
+            fetch('/dev-settings')
+            .then(response => response.json())
+            .then(fullSettings => {
+                // Start with full settings
+                Object.assign(settings, fullSettings);
+                
+                // Update only the editable sections
+                inputs.forEach(input => {
+                    const section = input.dataset.section;
+                    const key = input.dataset.key;
+                    
+                    if (settings[section]) {
+                        settings[section][key] = input.value;
+                    }
+                });
+                
+                return fetch('/save-dev-settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(settings)
+                });
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showStatus('Developer settings saved successfully', 'success');
+                } else {
+                    showStatus('Error saving settings: ' + result.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving dev settings:', error);
+                showStatus('Error saving developer settings', 'error');
+            });
+        }
+        
+        function resetDevSettings() {
+            if (confirm('Are you sure you want to reset all developer settings to default?')) {
+                fetch('/reset-dev-settings', { method: 'POST' })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        loadDevSettings();
+                        showStatus('Developer settings reset to default', 'success');
+                    } else {
+                        showStatus('Error resetting settings: ' + result.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error resetting dev settings:', error);
+                    showStatus('Error resetting developer settings', 'error');
+                });
+            }
         }
         
         function showCompletion(completionMessage) {
-            document.getElementById('progressStatus').textContent = "✅ Complete!";
-            document.getElementById('progressText').textContent = completionMessage || "Data has been processed and saved to Excel file.";
+            updateProgressBar(100);
+            
+            document.querySelector('.progress-container').style.display = 'none';
+            showStatus(completionMessage || "Data has been processed and saved to Excel file.", 'success');
         }
         
         function checkForCompletion() {
@@ -431,12 +612,12 @@ HTML_TEMPLATE = '''
             .then(response => response.json())
             .then(data => {
                 if (data.completed) {
-                    // Show completion message from progress data if available
                     const completionMessage = data.progress && data.progress.message ? data.progress.message : null;
                     showCompletion(completionMessage);
                 } else if (data.progress) {
-                    // Update progress display with detailed information
-                    updateProgressDisplay(data.progress);
+                    // Update progress bar with percentage
+                    const percentage = data.progress.percentage || 0;
+                    updateProgressBar(percentage);
                     // Check again in 3 seconds for reasonable update frequency
                     setTimeout(checkForCompletion, 3000);
                 } else {
@@ -451,28 +632,6 @@ HTML_TEMPLATE = '''
             });
         }
         
-        function updateProgressDisplay(progress) {
-            const statusElement = document.getElementById('progressStatus');
-            const textElement = document.getElementById('progressText');
-            
-            let newStatus, newText;
-            
-            if (progress.total > 0) {
-                newStatus = `Processing...`;
-            } else {
-                newStatus = progress.message || "Processing...";
-            }
-            
-            newText = progress.message || "Please wait while the scraping process completes...";
-            
-            // Only update if the content has actually changed
-            if (statusElement.textContent !== newStatus) {
-                statusElement.textContent = newStatus;
-            }
-            if (textElement.textContent !== newText) {
-                textElement.textContent = newText;
-            }
-        }
         
     </script>
 </body>
@@ -485,14 +644,11 @@ server_running = False
 current_port = None
 scraping_completed = False
 progress_data = {
-    'current': 0,
-    'total': 0,
-    'message': 'Processing...',
+    'percentage': 0,
     'completed': False
 }
 
 def find_available_port(start_port=5000):
-    """Find an available port starting from start_port"""
     for port in range(start_port, start_port + 100):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -504,13 +660,10 @@ def find_available_port(start_port=5000):
 
 @app.route('/')
 def index():
-    print("🔍 Serving updated HTML template with debug mode checkbox")
     return render_template_string(HTML_TEMPLATE)
 
 @app.route('/logo.jpg')
 def logo():
-    import os
-    # Get the directory where this script is located (project root)
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_from_directory(current_dir, 'logo.jpg')
 
@@ -520,19 +673,13 @@ def submit():
     try:
         data = request.get_json()
         
-        # Validate data
         if not data.get('company_name'):
             return jsonify({'success': False, 'message': 'Company name is required'})
         
-        if data.get('max_rows', 0) <= 0:
-            return jsonify({'success': False, 'message': 'Max rows must be greater than 0'})
         
-        # Reset completion status and progress for new scraping process
         scraping_completed = False
         progress_data = {
-            'current': 0,
-            'total': 0,
-            'message': 'Processing...',
+            'percentage': 0,
             'completed': False
         }
         result_data = data
@@ -549,15 +696,12 @@ def cancel():
 
 @app.route('/progress', methods=['POST'])
 def update_progress():
-    """Receive progress updates from the scraper"""
     global progress_data
     try:
         data = request.get_json()
         
         progress_data.update({
-            'current': data.get('current', 0),
-            'total': data.get('total', 0),
-            'message': data.get('message', 'Processing...'),
+            'percentage': data.get('percentage', 0),
             'completed': data.get('completed', False)
         })
         return jsonify({'success': True})
@@ -566,15 +710,91 @@ def update_progress():
 
 @app.route('/check-status', methods=['GET'])
 def check_status():
-    """Check if scraping process has completed and get current progress"""
     global scraping_completed, progress_data
     return jsonify({
         'completed': scraping_completed,
         'progress': progress_data
     })
 
+@app.route('/dev-settings', methods=['GET'])
+def get_dev_settings():
+    """Get developer settings"""
+    try:
+        from settings import SYSTEM
+        return jsonify(SYSTEM)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/save-dev-settings', methods=['POST'])
+def save_dev_settings():
+    """Save developer settings"""
+    try:
+        data = request.get_json()
+        
+        # Save to system_constants.json
+        with open('system_constants.json', 'w', encoding='utf-8') as f:
+            import json
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/reset-dev-settings', methods=['POST'])
+def reset_dev_settings():
+    """Reset developer settings to default"""
+    try:
+        # Load default settings from backup or recreate them
+        default_settings = {
+            "urls": {
+                "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
+            },
+            "files": {
+                "output_json_file": "details_links.json",
+                "output_excel_file": "results.xlsx"
+            },
+            "application": {
+                "target_keywords": ["CB", "EB", "BW"]
+            },
+            "defaults": {
+                "company_name": "에스티팜",
+                "from_date": "2025-09-16",
+                "to_date": "2025-09-30"
+            },
+            "timing": {
+                "buffer_time": 0.5,
+                "short_loadtime": 2,
+                "long_loadtime": 3,
+                "long_waitcount": 10,
+                "short_waitcount": 10,
+                "load_timeout": 10,
+                "timeout": 1
+            },
+            "selectors": {
+                "reset_selector": "#bfrDsclsType",
+                "market_measures_selector": "//a[contains(text(), '시장조치') or contains(@title, '시장조치')]",
+                "new_stock_selector": "//input[@type='checkbox']/following-sibling::*[contains(text(), '신규/추가/변경/재상장')]/preceding-sibling::input[@type='checkbox']",
+                "search_button_selector": "//form[@id='searchForm']//section[contains(@class, 'search-group')]//div[@class='btn-group type-bt']//a[contains(@class, 'search-btn')]",
+                "result_row_selector": "table.list.type-00",
+                "company_input_selector": "#AKCKwd",
+                "from_date_selector": "input[name='fromDate']",
+                "to_date_selector": "input[name='toDate']",
+                "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
+                "table_selector": "table, iframe",
+                "iframe_selector": "iframe[name='docViewFrm']",
+                "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc"
+            }
+        }
+        
+        with open('system_constants.json', 'w', encoding='utf-8') as f:
+            import json
+            json.dump(default_settings, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 def set_scraping_completed(completed=True):
-    """Set the scraping completion status"""
     global scraping_completed
     scraping_completed = completed
 
@@ -583,9 +803,6 @@ def start_server():
     global server_running, current_port
     server_running = True
     current_port = find_available_port()
-    
-    # Set the port environment variable for progress tracker
-    import os
     os.environ['WEB_UI_PORT'] = str(current_port)
     
     print(f"🌐 Starting server on port {current_port}")
@@ -595,31 +812,19 @@ def start_server():
     app.run(host='127.0.0.1', port=current_port, debug=False, use_reloader=False)
 
 def get_user_input():
-    """Show the web-based input dialog and return the result"""
     global result_data, server_running, current_port
     
-    # Start server in a separate thread
     server_thread = threading.Thread(target=start_server)
     server_thread.daemon = True
     server_thread.start()
     
-    # Wait for server to start and get the port
-    time.sleep(0.5)
-    
-    # Open browser with the actual port
-    if current_port:
-        webbrowser.open(f'http://127.0.0.1:{current_port}')
-        print(f"🌐 Opened browser at http://127.0.0.1:{current_port}")
-    else:
-        print("❌ Failed to start server")
-        return None
-    
-    # Wait for user input
+    time.sleep(get("buffer_time"))
+    if current_port: webbrowser.open(f'http://127.0.0.1:{current_port}')
+    else: return None
     while server_running:
         if result_data is not None:
             break
         time.sleep(0.1)
-    
     return result_data
 
 if __name__ == "__main__":

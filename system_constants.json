@@ -7,11 +7,14 @@
     "output_excel_file": "results.xlsx"
   },
   "application": {
-    "target_keywords": ["CB", "EB", "BW"]
+    "target_keywords": [
+      "CB",
+      "EB",
+      "BW"
+    ]
   },
   "defaults": {
-    "max_rows": 4,
-    "company_name": "에스티팜",
+    "company_name": "",
     "from_date": "2025-09-16",
     "to_date": "2025-09-30"
   },

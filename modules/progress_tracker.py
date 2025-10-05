@@ -3,40 +3,20 @@ import time
 import os
 from settings import get
 
-# Progress tracking for web interface
-def send_progress_update(current=0, total=0, message="Processing...", completed=False):
-    """Send progress update to the web interface"""
+def send_progress_update(percentage=0, completed=False):
     try:
-        # Get the port from environment variable or try common ports
-        port = os.environ.get('WEB_UI_PORT', '5000')
+        port = os.environ.get('WEB_UI_PORT')
         url = f'http://127.0.0.1:{port}/progress'
-        
-        # Try to send progress update to web interface
         requests.post(url, 
                      json={
-                         'current': current,
-                         'total': total,
-                         'message': message,
+                         'percentage': percentage,
                          'completed': completed
                      }, timeout=1)
-    except Exception as e:
-        # Ignore if web interface is not available
-        pass
+    except: pass
 
-def send_page_progress(page_num, total_pages=None):
-    """Send page processing progress"""
-    if total_pages:
-        message = f"Processing page {page_num} of {total_pages}..."
-    else:
-        message = f"Processing page {page_num}..."
-    send_progress_update(current=page_num, total=total_pages, message=message)
+def send_report_progress(current, total):
+    percentage = (current / total) * 100 if total > 0 else 0
+    send_progress_update(percentage=percentage)
 
-def send_report_progress(current, total, message=None):
-    """Send report processing progress"""
-    if message is None:
-        message = f"Processing report {current} of {total}..."
-    send_progress_update(current=current, total=total, message=message)
-
-def send_completion(message="Scraping completed successfully!"):
-    """Send completion status"""
-    send_progress_update(message=message, completed=True)
+def send_completion():
+    send_progress_update(percentage=100, completed=True)
