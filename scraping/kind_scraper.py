@@ -14,7 +14,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from settings import get
 
 from modules.driver_manager import setup_driver, find_result_rows, extract_table_data, click_next_page
-from modules.progress_tracker import send_progress_update
+from modules.progress_tracker import send_progress_update, send_page_progress, send_report_progress, send_completion
+
 
 class KINDScraper:
     def __init__(self, company_name=None, from_date=None, to_date=None, max_rows=None, headless=False, debug_mode=False):
@@ -116,7 +117,9 @@ class KINDScraper:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 if len(cells) >= 1: first_report_number = cells[0].text.strip()      
 
-            send_progress_update(f"Processing report {i} of {total_rows}")
+            # Send progress update every 5 reports or on the last report
+            if (i + 1) % 5 == 0 or (i + 1) == total_rows:
+                send_report_progress(i + 1, total_rows, f"Processing report {i + 1} of {total_rows}")
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 print(cells)
@@ -222,8 +225,9 @@ class KINDScraper:
         page_num = 1
         
         while True:
-            print(f"Processing page {page_num}...")
-            send_progress_update(f"Processing page {page_num}...")
+            print(f"📄 Processing page {page_num}...")
+            # Send page progress update
+            send_page_progress(page_num)
             page_results = self.click_and_capture_links(self.max_rows)
             all_results.extend(page_results)
             print(f"✅ Found {len(page_results)} relevant results on page {page_num}")
@@ -240,20 +244,20 @@ class KINDScraper:
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             self.perform_search()
             items = self.process_all_pages()
-            send_progress_update("Saving results...")
+            print("💾 Saving results...")
+            send_progress_update(message="Saving results to JSON file...")
             
             # Save results to JSON
             output_file = get("output_json_file")
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(items, f, ensure_ascii=False, indent=2)
             print(f"💾 Saved {len(items)} links to {output_file}")
-            send_progress_update("Scraping completed successfully!", completed=True)
+            print("✅ Scraping completed successfully!")
             
             return items
             
         except Exception as e:
             print(f"❌ Scraping failed: {e}")
-            send_progress_update(f"Scraping failed: {e}", completed=True)
             raise  # BREAK ON FAILURE
         finally:
             self.cleanup()

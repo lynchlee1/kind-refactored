@@ -210,7 +210,7 @@ HTML_TEMPLATE = '''
             margin-top: 20px;
         }
         
-        .progress-container {
+        .progress-display {
             display: none;
             margin-top: 20px;
             padding: 20px;
@@ -219,37 +219,19 @@ HTML_TEMPLATE = '''
             border: 1px solid #e9ecef;
         }
         
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #007bff, #0056b3);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-        
-        .progress-fill.completed {
-            background: linear-gradient(90deg, #28a745, #1e7e34);
+        .progress-status {
+            font-size: 16px;
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 8px;
         }
         
         .progress-text {
             font-size: 14px;
             color: #6c757d;
-            margin-bottom: 5px;
+            line-height: 1.4;
         }
         
-        .progress-details {
-            font-size: 12px;
-            color: #6c757d;
-        }
         
         .spinner {
             border: 3px solid #f3f3f3;
@@ -320,12 +302,9 @@ HTML_TEMPLATE = '''
                 <p>Starting web scraping...</p>
             </div>
             
-            <div class="progress-container" id="progressContainer">
-                <div class="progress-text" id="progressText">Initializing...</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="progress-details" id="progressDetails">Connecting to KIND website...</div>
+            <div class="progress-display" id="progressDisplay" style="display: none;">
+                <div class="progress-status" id="progressStatus">Initializing...</div>
+                <div class="progress-text" id="progressText">Connecting to KIND website...</div>
             </div>
             
             <div class="status" id="status"></div>
@@ -354,16 +333,16 @@ HTML_TEMPLATE = '''
                 return;
             }
             
-            // Show progress
+            // Show progress display
             document.querySelector('.loading').style.display = 'none';
-            document.querySelector('.progress-container').style.display = 'block';
+            document.querySelector('.progress-display').style.display = 'block';
             document.querySelector('.button-group').style.display = 'none';
             
             // Start progress simulation
-            simulateProgress();
+            startProgressSimulation();
             
-            // Start polling for real progress updates
-            startProgressPolling();
+            // Start checking for completion
+            checkForCompletion();
             
             // Send data to server
             fetch('/submit', {
@@ -380,12 +359,14 @@ HTML_TEMPLATE = '''
                 } else {
                     showStatus('Error: ' + result.message, 'error');
                     document.querySelector('.loading').style.display = 'none';
+                    document.querySelector('.progress-display').style.display = 'none';
                     document.querySelector('.button-group').style.display = 'flex';
                 }
             })
             .catch(error => {
                 showStatus('Error: ' + error.message, 'error');
                 document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.progress-display').style.display = 'none';
                 document.querySelector('.button-group').style.display = 'flex';
             });
         });
@@ -405,108 +386,110 @@ HTML_TEMPLATE = '''
             status.style.display = 'block';
         }
         
-        function simulateProgress() {
-            let progress = 0;
-            let currentStep = 0;
+        function startProgressSimulation() {
             const steps = [
-                { text: "Connecting to KIND website...", progress: 0 },
-                { text: "Navigating to search page...", progress: 0 },
-                { text: "Entering company name: 에스티팜...", progress: 0 },
-                { text: "Setting date range...", progress: 0 },
-                { text: "Clicking search button...", progress: 0 },
-                { text: "Loading search results...", progress: 0 },
-                { text: "Finding result rows...", progress: 0 },
-                { text: "Extracting data from reports...", progress: 0 },
-                { text: "Processing extracted data...", progress: 95 },
-                { text: "Finalizing and saving results...", progress: 100 }
+                { status: "Initializing...", text: "Setting up web driver..." },
+                { status: "Connecting...", text: "Navigating to KIND website..." },
+                { status: "Searching...", text: "Entering company name and date range..." },
+                { status: "Loading...", text: "Clicking search button and loading results..." },
+                { status: "Processing...", text: "Finding and extracting data from reports..." },
+                { status: "Saving...", text: "Processing extracted data and saving to Excel..." }
             ];
+            
+            let currentStep = 0;
             
             function updateProgress() {
                 if (currentStep < steps.length) {
                     const step = steps[currentStep];
-                    progress = step.progress;
-                    
-                    document.getElementById('progressFill').style.width = progress + '%';
-                    document.getElementById('progressText').textContent = `Progress: ${progress}%`;
-                    document.getElementById('progressDetails').textContent = step.text;
-                    
+                    document.getElementById('progressStatus').textContent = step.status;
+                    document.getElementById('progressText').textContent = step.text;
                     currentStep++;
                     
-                    // Simulate processing time
-                    const delay = currentStep <= 5 ? 1500 : 2000; // Faster initial steps
+                    // Simulate processing time - faster steps for better UX
+                    const delay = currentStep <= 3 ? 2000 : 3000;
                     setTimeout(updateProgress, delay);
                 } else {
-                    // Keep at 100% until process completes
-                    document.getElementById('progressText').textContent = 'Progress: 100%';
-                    document.getElementById('progressDetails').textContent = 'Scraping completed! Processing results...';
+                    // Keep showing "Processing..." until actual completion
+                    document.getElementById('progressStatus').textContent = "Processing...";
+                    document.getElementById('progressText').textContent = "Please wait while the scraping process completes. This may take several minutes depending on the number of reports.";
+                    
+                    // Continue showing processing status every 10 seconds
+                    setTimeout(updateProgress, 10000);
                 }
             }
             
             updateProgress();
         }
         
-        function updateProgressFromServer(currentReport, totalReports, firstReportNumber, completed) {
-            if (currentReport && totalReports) {
-                const progress = Math.min(95, Math.round((currentReport / totalReports) * 100));
-                document.getElementById('progressFill').style.width = progress + '%';
-                
-                if (completed) {
-                    // Show green bar when completed
-                    document.getElementById('progressFill').classList.add('completed');
-                    document.getElementById('progressFill').style.width = '100%';
-                    document.getElementById('progressText').textContent = '100%';
-                    document.getElementById('progressDetails').textContent = 'Web scraping process completed successfully!';
-                } else if (firstReportNumber) {
-                    // Show report number format: "X / firstReportNumber"
-                    document.getElementById('progressText').textContent = `${currentReport} / ${firstReportNumber}`;
-                    document.getElementById('progressDetails').textContent = `Processing report ${currentReport} of ${totalReports}...`;
+        function showCompletion(completionMessage) {
+            document.getElementById('progressStatus').textContent = "✅ Complete!";
+            document.getElementById('progressText').textContent = completionMessage || "Data has been processed and saved to Excel file.";
+        }
+        
+        function checkForCompletion() {
+            fetch('/check-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.completed) {
+                    // Show completion message from progress data if available
+                    const completionMessage = data.progress && data.progress.message ? data.progress.message : null;
+                    showCompletion(completionMessage);
+                } else if (data.progress) {
+                    // Update progress display with detailed information
+                    updateProgressDisplay(data.progress);
+                    // Check again in 3 seconds for reasonable update frequency
+                    setTimeout(checkForCompletion, 3000);
                 } else {
-                    // Fallback to percentage format
-                    document.getElementById('progressText').textContent = `Progress: ${progress}%`;
-                    document.getElementById('progressDetails').textContent = `Processing report ${currentReport} of ${totalReports}...`;
+                    // Check again in 5 seconds if no progress data
+                    setTimeout(checkForCompletion, 5000);
                 }
+            })
+            .catch(error => {
+                console.log('Status check error:', error);
+                // Continue checking even if there's an error
+                setTimeout(checkForCompletion, 10000);
+            });
+        }
+        
+        function updateProgressDisplay(progress) {
+            const statusElement = document.getElementById('progressStatus');
+            const textElement = document.getElementById('progressText');
+            
+            let newStatus, newText;
+            
+            if (progress.total > 0) {
+                newStatus = `Processing...`;
+            } else {
+                newStatus = progress.message || "Processing...";
+            }
+            
+            newText = progress.message || "Please wait while the scraping process completes...";
+            
+            // Only update if the content has actually changed
+            if (statusElement.textContent !== newStatus) {
+                statusElement.textContent = newStatus;
+            }
+            if (textElement.textContent !== newText) {
+                textElement.textContent = newText;
             }
         }
         
-        function startProgressPolling() {
-            let pollingInterval = setInterval(() => {
-                fetch('/get-progress')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.progress) {
-                        updateProgressFromServer(
-                            data.progress.current_report,
-                            data.progress.total_reports,
-                            data.progress.first_report_number,
-                            data.progress.completed
-                        );
-                        
-                        // Stop polling if completed
-                        if (data.progress.completed) {
-                            clearInterval(pollingInterval);
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.log('Progress polling error:', error);
-                });
-            }, 1000); // Poll every second
-            
-            // Stop polling after 10 minutes to avoid infinite polling
-            setTimeout(() => {
-                clearInterval(pollingInterval);
-            }, 600000);
-        }
     </script>
 </body>
 </html>
 '''
 
-# Global variable to store the result
+# Global variables to store the result and process status
 result_data = None
 server_running = False
 current_port = None
-progress_data = None
+scraping_completed = False
+progress_data = {
+    'current': 0,
+    'total': 0,
+    'message': 'Processing...',
+    'completed': False
+}
 
 def find_available_port(start_port=5000):
     """Find an available port starting from start_port"""
@@ -533,7 +516,7 @@ def logo():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    global result_data
+    global result_data, scraping_completed, progress_data
     try:
         data = request.get_json()
         
@@ -544,6 +527,14 @@ def submit():
         if data.get('max_rows', 0) <= 0:
             return jsonify({'success': False, 'message': 'Max rows must be greater than 0'})
         
+        # Reset completion status and progress for new scraping process
+        scraping_completed = False
+        progress_data = {
+            'current': 0,
+            'total': 0,
+            'message': 'Processing...',
+            'completed': False
+        }
         result_data = data
         return jsonify({'success': True})
         
@@ -558,42 +549,45 @@ def cancel():
 
 @app.route('/progress', methods=['POST'])
 def update_progress():
-    """Endpoint to receive progress updates from the scraper"""
+    """Receive progress updates from the scraper"""
+    global progress_data
     try:
         data = request.get_json()
-        current_report = data.get('current_report')
-        total_reports = data.get('total_reports')
-        message = data.get('message', 'Processing...')
-        first_report_number = data.get('first_report_number')
-        completed = data.get('completed', False)
         
-        # Store progress data globally
-        global progress_data
-        progress_data = {
-            'current_report': current_report,
-            'total_reports': total_reports,
-            'message': message,
-            'first_report_number': first_report_number,
-            'completed': completed
-        }
-        
+        progress_data.update({
+            'current': data.get('current', 0),
+            'total': data.get('total', 0),
+            'message': data.get('message', 'Processing...'),
+            'completed': data.get('completed', False)
+        })
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/get-progress', methods=['GET'])
-def get_progress():
-    """Endpoint to get current progress data"""
-    global progress_data
-    if progress_data:
-        return jsonify({'success': True, 'progress': progress_data})
-    else:
-        return jsonify({'success': False, 'message': 'No progress data available'})
+@app.route('/check-status', methods=['GET'])
+def check_status():
+    """Check if scraping process has completed and get current progress"""
+    global scraping_completed, progress_data
+    return jsonify({
+        'completed': scraping_completed,
+        'progress': progress_data
+    })
+
+def set_scraping_completed(completed=True):
+    """Set the scraping completion status"""
+    global scraping_completed
+    scraping_completed = completed
+
 
 def start_server():
     global server_running, current_port
     server_running = True
     current_port = find_available_port()
+    
+    # Set the port environment variable for progress tracker
+    import os
+    os.environ['WEB_UI_PORT'] = str(current_port)
+    
     print(f"🌐 Starting server on port {current_port}")
     import logging
     log = logging.getLogger('werkzeug')

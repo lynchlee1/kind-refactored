@@ -1,10 +1,5 @@
-"""
-Web driver management and utilities
-"""
-
 import time
 from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -165,41 +160,26 @@ def extract_table_data(driver, wait):
     return extract_direct_tables(driver, wait)
 
 def click_next_page(driver, wait):
+    next_button = None
+    next_page_selector = get("next_page_selector")
     try:
-        next_button = None
-        next_page_selector = get("next_page_selector")
-        try:
-            next_button = driver.find_element(By.CSS_SELECTOR, next_page_selector)
-            print(f"✅ Found next button with selector: {next_page_selector}")
-        except Exception: raise Exception(f"❌ 다음 페이지 버튼 찾기 실패")
-        
-        current_report_number = ""
-        try:
-            current_report_number = driver.find_element(By.CSS_SELECTOR, get("first_idx_selector")).text.strip()
-        except Exception: raise Exception(f"❌ 현재 보고서 번호 찾기 실패")
-        
-        try:
-            driver.execute_script("arguments[0].click();", next_button)
-            print("✅ 다음 페이지 버튼 클릭 완료")
-        except Exception: raise Exception(f"❌ 다음 페이지 버튼 클릭 실패")
-        
-        # Wait for next page to load
-        time.sleep(get("short_loadtime"))
+        next_button = driver.find_element(By.CSS_SELECTOR, next_page_selector)
+        print(f"✅ Found next button with selector: {next_page_selector}")
+    except Exception: raise Exception(f"❌ 다음 페이지 버튼 찾기 실패")
+    
+    current_report_number = ""
+    try:
+        current_report_number = driver.find_element(By.CSS_SELECTOR, get("first_idx_selector")).text.strip()
+    except Exception: raise Exception(f"❌ 현재 보고서 번호 찾기 실패")
+    
+    try:
+        driver.execute_script("arguments[0].click();", next_button)
+        print("✅ 다음 페이지 버튼 클릭 완료")
+    except Exception: raise Exception(f"❌ 다음 페이지 버튼 클릭 실패")
+    time.sleep(get("short_loadtime"))
 
-        try:
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#main-contents")))
-            
-            new_report_number = driver.find_element(By.CSS_SELECTOR, "first_idx_selector").text.strip()            
-            if current_report_number and new_report_number != current_report_number:
-                print(f"✅ Page changed! New report number: {new_report_number}")
-                return True
-            elif not current_report_number:
-                # If we couldn't get the original number, assume success
-                print("✅ Page navigation completed (no previous number to compare)")
-                return True
-            else:
-                print(f"⚠️ Page may not have changed. Old: {current_report_number}, New: {new_report_number}")
-                return False
-                
-        except Exception as e: raise Exception(f"❌ Could not verify page change: {e}")
-    except Exception as e: raise Exception(f"❌ Error in click_next_page: {e}")
+    try:
+        new_report_number = driver.find_element(By.CSS_SELECTOR, get("first_idx_selector")).text.strip()            
+        if current_report_number and new_report_number != current_report_number: return True
+        else: return False
+    except Exception as e: raise Exception(f"❌ 페이지 변경 오류: {e}")
