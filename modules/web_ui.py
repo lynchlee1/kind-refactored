@@ -323,7 +323,7 @@ HTML_TEMPLATE = '''
         
         <form id="configForm">
             <div class="form-group">
-                <label class="form-label" for="company">Company Name</label>
+                <label class="form-label" for="company">기업명</label>
                 <input type="text" id="company" name="company" class="form-input" 
                        value="" required>
             </div>
@@ -331,7 +331,7 @@ HTML_TEMPLATE = '''
             <div class="form-group">
                 <div class="date-row">
                     <div>
-                        <label class="form-label" for="fromDate">From Date</label>
+                        <label class="form-label" for="fromDate">시작일</label>
                         <input type="date" id="fromDate" name="fromDate" class="form-input" 
                                value="2024-09-20" required>
                     </div>
@@ -373,8 +373,6 @@ HTML_TEMPLATE = '''
                     <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">Close</button>
                 </div>
             </div>
-            
-            <div class="status" id="status"></div>
         </form>
     </div>
     
@@ -430,15 +428,8 @@ HTML_TEMPLATE = '''
         function cancel() {
             fetch('/cancel', { method: 'POST' })
             .then(() => {
-                showStatus('Operation cancelled', 'error');
+                console.log('Operation cancelled');
             });
-        }
-        
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = 'status ' + type;
-            status.style.display = 'block';
         }
         
         function updateProgressBar(percentage) {
@@ -568,17 +559,8 @@ HTML_TEMPLATE = '''
                 });
             })
             .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showStatus('Developer settings saved successfully', 'success');
-                } else {
-                    showStatus('Error saving settings: ' + result.message, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error saving dev settings:', error);
-                showStatus('Error saving developer settings', 'error');
-            });
+            .then(result => { console.log('Developer settings save result:', result); })
+            .catch(error => { console.error('Error saving dev settings:', error); });
         }
         
         function resetDevSettings() {
@@ -588,46 +570,36 @@ HTML_TEMPLATE = '''
                 .then(result => {
                     if (result.success) {
                         loadDevSettings();
-                        showStatus('Developer settings reset to default', 'success');
+                        console.log('Developer settings reset to default');
                     } else {
-                        showStatus('Error resetting settings: ' + result.message, 'error');
+                        console.error('Error resetting settings:', result.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error resetting dev settings:', error);
-                    showStatus('Error resetting developer settings', 'error');
                 });
             }
         }
         
-        function showCompletion(completionMessage) {
+        function showCompletion() {
             updateProgressBar(100);
-            
             document.querySelector('.progress-container').style.display = 'none';
-            showStatus(completionMessage || "Data has been processed and saved to Excel file.", 'success');
+            document.querySelector('.button-group').style.display = 'flex';
         }
         
         function checkForCompletion() {
             fetch('/check-status')
             .then(response => response.json())
             .then(data => {
-                if (data.completed) {
-                    const completionMessage = data.progress && data.progress.message ? data.progress.message : null;
-                    showCompletion(completionMessage);
-                } else if (data.progress) {
-                    // Update progress bar with percentage
-                    const percentage = data.progress.percentage || 0;
-                    updateProgressBar(percentage);
-                    // Check again in 3 seconds for reasonable update frequency
-                    setTimeout(checkForCompletion, 3000);
+                const percentage = (data && data.progress && data.progress.percentage) ? data.progress.percentage : 0;
+                updateProgressBar(percentage);
+                if (percentage >= 100) {
+                    showCompletion();
                 } else {
-                    // Check again in 5 seconds if no progress data
-                    setTimeout(checkForCompletion, 5000);
+                    setTimeout(checkForCompletion, 3000);
                 }
             })
             .catch(error => {
-                console.log('Status check error:', error);
-                // Continue checking even if there's an error
                 setTimeout(checkForCompletion, 10000);
             });
         }
@@ -642,10 +614,8 @@ HTML_TEMPLATE = '''
 result_data = None
 server_running = False
 current_port = None
-scraping_completed = False
 progress_data = {
-    'percentage': 0,
-    'completed': False
+    'percentage': 0
 }
 
 def find_available_port(start_port=5000):
@@ -669,7 +639,7 @@ def logo():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    global result_data, scraping_completed, progress_data
+    global result_data, progress_data
     try:
         data = request.get_json()
         
@@ -677,11 +647,7 @@ def submit():
             return jsonify({'success': False, 'message': 'Company name is required'})
         
         
-        scraping_completed = False
-        progress_data = {
-            'percentage': 0,
-            'completed': False
-        }
+        progress_data = {'percentage': 0}
         result_data = data
         return jsonify({'success': True})
         
@@ -700,21 +666,15 @@ def update_progress():
     try:
         data = request.get_json()
         
-        progress_data.update({
-            'percentage': data.get('percentage', 0),
-            'completed': data.get('completed', False)
-        })
+        progress_data.update({ 'percentage': data.get('percentage', 0) })
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/check-status', methods=['GET'])
 def check_status():
-    global scraping_completed, progress_data
-    return jsonify({
-        'completed': scraping_completed,
-        'progress': progress_data
-    })
+    global progress_data
+    return jsonify({ 'progress': progress_data })
 
 @app.route('/dev-settings', methods=['GET'])
 def get_dev_settings():
@@ -731,6 +691,31 @@ def save_dev_settings():
     try:
         data = request.get_json()
         
+        # Coerce numeric timing values to proper numbers
+        try:
+            timing = data.get('timing', {}) or {}
+            numeric_keys = [
+                'buffer_time', 'short_loadtime', 'long_loadtime',
+                'long_waitcount', 'short_waitcount', 'load_timeout', 'timeout'
+            ]
+            for key in numeric_keys:
+                if key in timing:
+                    val = timing[key]
+                    if isinstance(val, str):
+                        # Try int first, then float
+                        try:
+                            if val.strip().isdigit():
+                                timing[key] = int(val)
+                            else:
+                                timing[key] = float(val)
+                        except Exception:
+                            # Leave as-is if not parseable
+                            pass
+            data['timing'] = timing
+        except Exception:
+            # If anything goes wrong, proceed without coercion
+            pass
+
         # Save to system_constants.json
         with open('system_constants.json', 'w', encoding='utf-8') as f:
             import json
@@ -757,7 +742,7 @@ def reset_dev_settings():
                 "target_keywords": ["CB", "EB", "BW"]
             },
             "defaults": {
-                "company_name": "에스티팜",
+                "company_name": "",
                 "from_date": "2025-09-16",
                 "to_date": "2025-09-30"
             },
@@ -794,10 +779,6 @@ def reset_dev_settings():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-def set_scraping_completed(completed=True):
-    global scraping_completed
-    scraping_completed = completed
-
 
 def start_server():
     global server_running, current_port
@@ -805,7 +786,7 @@ def start_server():
     current_port = find_available_port()
     os.environ['WEB_UI_PORT'] = str(current_port)
     
-    print(f"🌐 Starting server on port {current_port}")
+    print(f"Starting server on port {current_port}")
     import logging
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)

@@ -52,8 +52,8 @@ def setup_driver(headless):
     try:
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.set_page_load_timeout(get("load_timeout"))
-        wait = WebDriverWait(driver, get("load_timeout"))
+        driver.set_page_load_timeout(get("long_loadtime"))
+        wait = WebDriverWait(driver, get("long_loadtime"))
         print("✅ Chrome driver 로딩 완료")
         return driver, wait
     except Exception as e: raise Exception(f"❌ Chrome driver 로딩 실패: {e}")
@@ -171,11 +171,11 @@ def click_next_page(driver, wait):
     try:
         current_report_number = driver.find_element(By.CSS_SELECTOR, get("first_idx_selector")).text.strip()
     except Exception: raise Exception(f"❌ 현재 보고서 번호 찾기 실패")
-    
+
     try:
         driver.execute_script("arguments[0].click();", next_button)
-        print("✅ 다음 페이지 버튼 클릭 완료")
     except Exception: raise Exception(f"❌ 다음 페이지 버튼 클릭 실패")
+
     time.sleep(get("short_loadtime"))
 
     try:

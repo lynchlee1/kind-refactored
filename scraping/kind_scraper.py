@@ -14,7 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from settings import get
 
 from modules.driver_manager import setup_driver, find_result_rows, extract_table_data, click_next_page
-from modules.progress_tracker import send_progress_update, send_report_progress, send_completion
+from modules.progress_tracker import update_progress
 
 
 class KINDScraper:
@@ -116,7 +116,7 @@ class KINDScraper:
                 if len(cells) >= 1: first_report_number = cells[0].text.strip()      
 
             if i < total_rows:
-                send_report_progress(i + 1, total_rows)
+                update_progress(i/total_rows*90)
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 date_txt = cells[1].text.strip() if len(cells) >= 2 else ""

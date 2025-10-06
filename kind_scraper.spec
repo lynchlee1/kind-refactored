@@ -9,7 +9,6 @@ a = Analysis(
     datas=[
         ('logo.jpg', '.'),
         ('system_constants.json', '.'),
-        ('user_settings.json', '.'),
         ('requirements.txt', '.'),
     ],
     hiddenimports=[

@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from settings import get
 
-def process_data_to_excel():
+def process_to_excel():
     try:
         with open(get("output_json_file", "details_links.json"), 'r', encoding='utf-8') as f: items = json.load(f)
         new_data_for_excel = []
