@@ -396,9 +396,9 @@ HTML_TEMPLATE = '''
                     <!-- Developer settings will be loaded here -->
                 </div>
                 <div class="button-group" style="margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="saveDevSettings()">설정 저장하기</button>
-                    <button type="button" class="btn btn-secondary" onclick="resetDevSettings()">기본 설정으로 되돌리기</button>
-                    <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">개발자 설정 닫기</button>
+                    <button type="button" class="btn btn-secondary" onclick="saveDevSettings()">저장</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetDevSettings()">되돌리기</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">닫기</button>
                 </div>
             </div>
         </form>
