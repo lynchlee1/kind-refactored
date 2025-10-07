@@ -823,11 +823,36 @@ def records():
             rows = [r for r in rows if str(r.get('round','')).strip() == round_filter]
         first_date = entry.get('first_date') or '-'
         last_date = entry.get('last_date') or '-'
-        # Simple table HTML
-        table_rows = ''.join(
-            f"<tr><td>{i+1}</td><td>{r.get('date','')}</td><td>{r.get('round','')}</td><td>{r.get('additional_shares','')}</td><td>{r.get('issue_price','')}</td></tr>"
-            for i, r in enumerate(rows)
-        )
+        
+        # Sort by time (asc oldest->newest) and compute per-row totals and accumulations
+        def to_int(x):
+            try:
+                return int(str(x).replace(',', '').strip())
+            except:
+                return 0
+        rows_sorted = sorted(rows, key=lambda r: str(r.get('date','')))  # ascending
+        acc_shares = 0
+        acc_amount = 0
+        rendered_rows = []
+        for idx, r in enumerate(rows_sorted, start=1):
+            shares = to_int(r.get('additional_shares',''))
+            price = to_int(r.get('issue_price',''))
+            amount = shares * price
+            acc_shares += shares
+            acc_amount += amount
+            rendered_rows.append(
+                f"<tr>"
+                f"<td>{idx}</td>"  
+                f"<td>{r.get('date','')}</td>"  
+                f"<td>{r.get('round','')}</td>"  
+                f"<td style='text-align:right'>{r.get('additional_shares','')}</td>"  
+                f"<td style='text-align:right'>{format(acc_shares,',')}</td>"  
+                f"<td style='text-align:right'>{r.get('issue_price','')}</td>"  
+                f"<td style='text-align:right'>{format(amount,',')}</td>"  
+                f"<td style='text-align:right'>{format(acc_amount,',')}</td>"  
+                f"</tr>"
+            )
+        table_rows = ''.join(rendered_rows)
         html = f"""
         <html><head>
         <meta charset='utf-8'>
@@ -845,6 +870,10 @@ def records():
         .btn:active{{opacity:.9}}
         .filter{{display:flex;gap:8px;align-items:center;}}
         .input{{height:36px;padding:0 10px;border:1px solid #d8e1ff;border-radius:8px;}}
+        td:nth-child(1), th:nth-child(1){{text-align:center;width:60px;}}
+        td:nth-child(3), th:nth-child(3){{text-align:center;width:80px;}}
+        td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7), td:nth-child(8),
+        th:nth-child(4), th:nth-child(5), th:nth-child(6), th:nth-child(7), th:nth-child(8){{text-align:right;}}
         </style></head><body>
         <div class='topbar'>
           <h2>기록 보기 - {company_key}</h2>
@@ -854,10 +883,10 @@ def records():
             <button class='btn' onclick="history.back()">뒤로</button>
           </div>
         </div>
-        <div class='meta'>총 {len(rows)} 건 ({first_date} ~ {last_date})</div>
+        <div class='meta'>총 {len(rows_sorted)} 건 ({first_date} ~ {last_date}) · 누적 추가주식수: {format(acc_shares,',')} · 누적 총액: {format(acc_amount,',')}</div>
         <table>
-          <thead><tr><th>#</th><th>발행시간</th><th>회차</th><th>추가주식수(주)</th><th>발행/전환/행사가액(원)</th></tr></thead>
-          <tbody>{table_rows or '<tr><td colspan=6 style="text-align:center;color:#888">데이터가 없습니다</td></tr>'}</tbody>
+          <thead><tr><th>#</th><th>발행시간</th><th>회차</th><th>추가주식수(주)</th><th>누적 추가주식수</th><th>발행/전환/행사가액(원)</th><th>총액</th><th>누적 총액</th></tr></thead>
+          <tbody>{table_rows or '<tr><td colspan=8 style="text-align:center;color:#888">데이터가 없습니다</td></tr>'}</tbody>
         </table>
         <script>
           function applyFilter(){{
