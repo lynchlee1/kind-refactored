@@ -49,7 +49,3 @@ geckodriver
 
 # Generated files
 details_links.json
-dev_settings.json
-
-# Old code files
-old_codes/
