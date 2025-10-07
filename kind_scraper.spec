@@ -10,6 +10,8 @@ a = Analysis(
         ('logo.jpg', '.'),
         ('system_constants.json', '.'),
         ('requirements.txt', '.'),
+        # Do not bundle database.json so it stays visible beside the exe
+        #('database.json', '.'),
     ],
     hiddenimports=[
         'flask',
@@ -41,7 +43,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['database.json'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -63,6 +65,7 @@ exe = EXE(
     strip=False,
     upx=True,
     upx_exclude=[],
+    # Ensure files written by the app live beside the exe, not in temp
     runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
