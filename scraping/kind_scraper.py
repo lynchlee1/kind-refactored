@@ -115,8 +115,7 @@ class KINDScraper:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 if len(cells) >= 1: first_report_number = cells[0].text.strip()      
 
-            if i < total_rows:
-                update_progress(i/total_rows*90)
+            update_progress(i/total_rows*100, first_report_number)
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 date_txt = cells[1].text.strip() if len(cells) >= 2 else ""
@@ -221,7 +220,6 @@ class KINDScraper:
         page_num = 1
         
         while True:
-            print(f"📄 Processing page {page_num}...")
             page_results = self.click_and_capture_links()
             all_results.extend(page_results)
             print(f"✅ Found {len(page_results)} relevant results on page {page_num}")
@@ -243,7 +241,7 @@ class KINDScraper:
             output_file = get("output_json_file")
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(items, f, ensure_ascii=False, indent=2)
-            print(f"💾 Saved {len(items)} links to {output_file}")
+            print(f"✅ Saved {len(items)} links to {output_file}")
             print("✅ Scraping completed successfully!")
             
             return items

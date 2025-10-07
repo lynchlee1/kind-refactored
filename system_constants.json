@@ -9,7 +9,7 @@
   "defaults": {
     "company_name": "",
     "from_date": "2025-09-16",
-    "to_date": "2025-09-30"
+    "to_date": ""
   },
   "files": {
     "output_excel_file": "results.xlsx",

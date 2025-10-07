@@ -170,7 +170,7 @@ def click_next_page(driver, wait):
     current_report_number = ""
     try:
         current_report_number = driver.find_element(By.CSS_SELECTOR, get("first_idx_selector")).text.strip()
-    except Exception: raise Exception(f"❌ 현재 보고서 번호 찾기 실패")
+    except Exception: return False
 
     try:
         driver.execute_script("arguments[0].click();", next_button)

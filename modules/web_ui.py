@@ -12,8 +12,10 @@ import socket
 import threading
 import time
 from settings import get
+import json
 
 app = Flask(__name__)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -37,6 +39,18 @@ HTML_TEMPLATE = '''
             align-items: center;
             justify-content: center;
             padding: 20px;
+        }
+        
+        /* Ensure buttons align nicely regardless of label length */
+        .button-group { 
+            display: flex; 
+            gap: 12px; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+        }
+        .btn { 
+            white-space: nowrap; 
+            min-width: 110px; 
         }
         
         .container {
@@ -206,6 +220,16 @@ HTML_TEMPLATE = '''
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .info-panel {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 12px;
+            background: #eef7ff;
+            border: 1px solid #cfe6ff;
+            color: #0c4a6e;
+            display: none;
+            font-size: 14px;
+        }
         
         .loading {
             display: none;
@@ -322,21 +346,22 @@ HTML_TEMPLATE = '''
         </div>
         
         <form id="configForm">
-            <div class="form-group">
+            <div class="form-group" id="companyGroup">
                 <label class="form-label" for="company">기업명</label>
                 <input type="text" id="company" name="company" class="form-input" 
                        value="" required>
             </div>
+            <div id="companyInfo" class="info-panel"></div>
             
             <div class="form-group">
-                <div class="date-row">
+                <div class="date-row" id="dateRow">
                     <div>
-                        <label class="form-label" for="fromDate">시작일</label>
+                        <label class="form-label" for="fromDate">검색 시작일</label>
                         <input type="date" id="fromDate" name="fromDate" class="form-input" 
                                value="2024-09-20" required>
                     </div>
                     <div>
-                        <label class="form-label" for="toDate">To Date</label>
+                        <label class="form-label" for="toDate">검색 종료일</label>
                         <input type="date" id="toDate" name="toDate" class="form-input" 
                                value="2025-09-30" required>
                     </div>
@@ -344,15 +369,18 @@ HTML_TEMPLATE = '''
             </div>
             
             
-            <div class="checkbox-group">
+            <div class="checkbox-group" id="headlessRow">
                 <input type="checkbox" id="headless" name="headless" class="checkbox">
-                <label for="headless" class="checkbox-label">Run in background (headless mode)</label>
+                <label for="headless" class="checkbox-label">Chrome 팝업 없이 실행하기</label>
             </div>
             
             <div class="button-group">
-                <button type="button" class="btn btn-secondary" onclick="cancel()">Cancel</button>
-                <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">Developer Mode</button>
-                <button type="submit" class="btn btn-primary">Start Scraping</button>
+                <button id="backBtn" type="button" class="btn btn-secondary" onclick="goBack()">이전</button>
+                <button id="devBtn" type="button" class="btn btn-secondary" onclick="toggleDevMode()" style="display:none">개발자 설정</button>
+                <button id="runBtn" type="submit" class="btn btn-primary" style="display:none">실행</button>
+                <button id="nextBtn" type="button" class="btn btn-primary" onclick="goNext()">다음</button>
+                <button id="recordsBtn" type="button" class="btn btn-primary" onclick="openRecords()" style="display:none">기록 보기</button>
+                <button id="closeBtn" type="button" class="btn btn-secondary" onclick="closeApplication()" style="display:none">닫기</button>
             </div>
             
             <div class="progress-container" id="progressContainer" style="display: none;">
@@ -368,9 +396,9 @@ HTML_TEMPLATE = '''
                     <!-- Developer settings will be loaded here -->
                 </div>
                 <div class="button-group" style="margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="saveDevSettings()">Save Settings</button>
-                    <button type="button" class="btn btn-secondary" onclick="resetDevSettings()">Reset to Default</button>
-                    <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">Close</button>
+                    <button type="button" class="btn btn-secondary" onclick="saveDevSettings()">설정 저장하기</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetDevSettings()">기본 설정으로 되돌리기</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleDevMode()">개발자 설정 닫기</button>
                 </div>
             </div>
         </form>
@@ -379,6 +407,14 @@ HTML_TEMPLATE = '''
     <script>
         document.getElementById('configForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            
+            // Only submit if we're on the second page (company info is visible)
+            const companyInfo = document.getElementById('companyInfo');
+            if (!companyInfo || companyInfo.style.display === 'none' || companyInfo.style.display === '') {
+                // On first page - trigger Next button instead
+                goNext();
+                return;
+            }
             
             const formData = new FormData(this);
             const data = {
@@ -425,19 +461,40 @@ HTML_TEMPLATE = '''
             });
         });
         
-        function cancel() {
-            fetch('/cancel', { method: 'POST' })
-            .then(() => {
-                console.log('Operation cancelled');
+        function goBack() {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('company')) {
+                url.searchParams.delete('company');
+                window.location.href = url.toString();
+                return;
+            }
+            window.history.back();
+        }
+        
+        function closeApplication() {
+            fetch('/close', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.close();
+                }
+            })
+            .catch(error => {
+                console.error('Error closing application:', error);
+                window.close();
             });
         }
         
-        function updateProgressBar(percentage) {
+        function updateProgressBar(percentage, firstReportNumber) {
             const progressFill = document.getElementById('progressFill');
             const progressPercentage = document.getElementById('progressPercentage');
             
             progressFill.style.width = percentage + '%';
-            progressPercentage.textContent = Math.round(percentage) + '%';
+            let text = Math.round(percentage) + '%';
+            if (firstReportNumber) {
+                text += ` (전체 ${firstReportNumber}개 발견됨)`;
+            }
+            progressPercentage.textContent = text;
         }
         
         function toggleDevMode() {
@@ -449,6 +506,98 @@ HTML_TEMPLATE = '''
                 container.style.display = 'none';
             }
         }
+        function openRecords() {
+            const company = getQueryParam('company');
+            // Ask for 회차 before navigating
+            const round = window.prompt('회차를 입력하세요 (비워두면 전체 표시)');
+            const url = new URL(window.location.href);
+            url.pathname = '/records';
+            if (company) url.searchParams.set('company', company);
+            if (round && round.trim().length > 0) url.searchParams.set('round', round.trim());
+            window.location.href = url.toString();
+        }
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const hasCompany = !!getQueryParam('company');
+            const dateRow = document.getElementById('dateRow');
+            const headlessRow = document.getElementById('headlessRow');
+            if (dateRow) dateRow.style.display = hasCompany ? 'grid' : 'none';
+            if (headlessRow) headlessRow.style.display = hasCompany ? 'flex' : 'none';
+        });
+        function goNext() {
+            const name = document.getElementById('company').value.trim();
+            if (!name) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('company', name);
+            window.location.href = url.toString();
+        }
+        function initCompanyView() {
+            const company = getQueryParam('company');
+            const companyInput = document.getElementById('company');
+            const infoPanel = document.getElementById('companyInfo');
+            const runBtn = document.getElementById('runBtn');
+            const devBtn = document.getElementById('devBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const backBtn = document.getElementById('backBtn');
+            const dateRow = document.getElementById('dateRow');
+            const headlessRow = document.getElementById('headlessRow');
+            const companyGroup = document.getElementById('companyGroup');
+            const recordsBtn = document.getElementById('recordsBtn');
+
+            if (company) {
+                companyInput.value = company;
+                // Show run/dev/records and hide next
+                runBtn.style.display = 'inline-block';
+                devBtn.style.display = 'inline-block';
+                nextBtn.style.display = 'none';
+                if (backBtn) backBtn.style.display = 'inline-block';
+                if (recordsBtn) recordsBtn.style.display = 'inline-block';
+                if (dateRow) dateRow.style.display = 'grid';
+                if (headlessRow) headlessRow.style.display = 'flex';
+                if (companyGroup) companyGroup.style.display = 'none';
+
+                const fromInput = document.getElementById('fromDate');
+                const toInput = document.getElementById('toDate');
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${yyyy}-${mm}-${dd}`;
+                if (toInput) toInput.value = todayStr;
+
+                fetch(`/company-info?name=${encodeURIComponent(company)}`)
+                    .then(r => r.json())
+                    .then(info => {
+                        if (info && info.found) {
+                            // Populate fromDate with stored last_date (last renew date); keep toDate as today
+                            if (info.last_date && fromInput) fromInput.value = info.last_date;
+                            infoPanel.innerHTML = `<b>${company}</b> : ${info.first_date || '-'} ~ ${info.last_date || '-'} 저장됨 (${info.count || 0}개 발견)`;
+                        } else {
+                            infoPanel.innerHTML = `저장된 데이터가 없습니다.`;
+                        }
+                        infoPanel.style.display = 'block';
+                    })
+                    .catch(() => {
+                        infoPanel.innerHTML = `저장된 데이터를 불러올 수 없습니다.`;
+                        infoPanel.style.display = 'block';
+                    });
+            } else {
+                runBtn.style.display = 'none';
+                devBtn.style.display = 'none';
+                nextBtn.style.display = 'inline-block';
+                if (backBtn) backBtn.style.display = 'none';
+                if (recordsBtn) recordsBtn.style.display = 'none';
+                infoPanel.style.display = 'none';
+                if (dateRow) dateRow.style.display = 'none';
+                if (headlessRow) headlessRow.style.display = 'none';
+                if (companyGroup) companyGroup.style.display = 'block';
+            }
+        }
+        // Initialize view on load
+        initCompanyView();
         
         function loadDevSettings() {
             fetch('/dev-settings')
@@ -585,6 +734,29 @@ HTML_TEMPLATE = '''
             updateProgressBar(100);
             document.querySelector('.progress-container').style.display = 'none';
             document.querySelector('.button-group').style.display = 'flex';
+            
+            // Show close button and hide other buttons
+            const runBtn = document.getElementById('runBtn');
+            const devBtn = document.getElementById('devBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const backBtn = document.getElementById('backBtn');
+            const recordsBtn = document.getElementById('recordsBtn');
+            const closeBtn = document.getElementById('closeBtn');
+            
+            if (runBtn) runBtn.style.display = 'none';
+            if (devBtn) devBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (backBtn) backBtn.style.display = 'none';
+            if (recordsBtn) recordsBtn.style.display = 'inline-block';
+            if (closeBtn) closeBtn.style.display = 'inline-block';
+
+            // Hide original form sections
+            const companyGroup = document.getElementById('companyGroup');
+            const dateRow = document.getElementById('dateRow');
+            const headlessRow = document.getElementById('headlessRow');
+            if (companyGroup) companyGroup.style.display = 'none';
+            if (dateRow) dateRow.style.display = 'none';
+            if (headlessRow) headlessRow.style.display = 'none';
         }
         
         function checkForCompletion() {
@@ -592,7 +764,8 @@ HTML_TEMPLATE = '''
             .then(response => response.json())
             .then(data => {
                 const percentage = (data && data.progress && data.progress.percentage) ? data.progress.percentage : 0;
-                updateProgressBar(percentage);
+                const firstReportNumber = (data && data.progress && data.progress.first_report_number) ? data.progress.first_report_number : null;
+                updateProgressBar(percentage, firstReportNumber);
                 if (percentage >= 100) {
                     showCompletion();
                 } else {
@@ -615,7 +788,8 @@ result_data = None
 server_running = False
 current_port = None
 progress_data = {
-    'percentage': 0
+    'percentage': 0,
+    'first_report_number': None
 }
 
 def find_available_port(start_port=5000):
@@ -632,10 +806,79 @@ def find_available_port(start_port=5000):
 def index():
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/records')
+def records():
+    try:
+        company = request.args.get('company', '')
+        round_filter = (request.args.get('round') or '').strip()
+        db_path = os.path.join(ROOT_DIR, 'database.json')
+        data = {}
+        if os.path.exists(db_path):
+            with open(db_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        company_key = company or next(iter(data.keys()), '')
+        entry = data.get(company_key, {})
+        rows = entry.get('data', [])
+        if round_filter:
+            rows = [r for r in rows if str(r.get('round','')).strip() == round_filter]
+        first_date = entry.get('first_date') or '-'
+        last_date = entry.get('last_date') or '-'
+        # Simple table HTML
+        table_rows = ''.join(
+            f"<tr><td>{i+1}</td><td>{r.get('date','')}</td><td>{r.get('round','')}</td><td>{r.get('additional_shares','')}</td><td>{r.get('issue_price','')}</td></tr>"
+            for i, r in enumerate(rows)
+        )
+        html = f"""
+        <html><head>
+        <meta charset='utf-8'>
+        <title>기록 보기 - {company_key}</title>
+        <style>
+        body{{font-family:'Segoe UI','Malgun Gothic',Arial,sans-serif;padding:20px;background:#f5f7fb;}}
+        h2{{margin-bottom:16px;color:#2c3e50;}}
+        .meta{{margin-bottom:12px;color:#555;}}
+        table{{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;}}
+        th,td{{padding:10px 12px;border-bottom:1px solid #eee;text-align:left;}}
+        th{{background:#f0f4ff;color:#2c3e50;}}
+        tr:hover{{background:#fafcff;}}
+        .topbar{{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;}}
+        .btn{{background:#0d6efd;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;}}
+        .btn:active{{opacity:.9}}
+        .filter{{display:flex;gap:8px;align-items:center;}}
+        .input{{height:36px;padding:0 10px;border:1px solid #d8e1ff;border-radius:8px;}}
+        </style></head><body>
+        <div class='topbar'>
+          <h2>기록 보기 - {company_key}</h2>
+          <div class='filter'>
+            <input id='roundInput' class='input' type='text' placeholder='회차 입력 (엔터로 검색)' value='{round_filter}'>
+            <button class='btn' onclick="applyFilter()">입력</button>
+            <button class='btn' onclick="history.back()">뒤로</button>
+          </div>
+        </div>
+        <div class='meta'>총 {len(rows)} 건 ({first_date} ~ {last_date})</div>
+        <table>
+          <thead><tr><th>#</th><th>발행시간</th><th>회차</th><th>추가주식수(주)</th><th>발행/전환/행사가액(원)</th></tr></thead>
+          <tbody>{table_rows or '<tr><td colspan=6 style="text-align:center;color:#888">데이터가 없습니다</td></tr>'}</tbody>
+        </table>
+        <script>
+          function applyFilter(){{
+            const v=document.getElementById('roundInput').value.trim();
+            const url=new URL(window.location.href);
+            if(v){{url.searchParams.set('round',v);}} else {{url.searchParams.delete('round');}}
+            window.location.href=url.toString();
+          }}
+          document.getElementById('roundInput').addEventListener('keydown',function(e){{
+            if(e.key==='Enter'){{applyFilter();}}
+          }});
+        </script>
+        </body></html>
+        """
+        return html
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/logo.jpg')
 def logo():
-    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return send_from_directory(current_dir, 'logo.jpg')
+    return send_from_directory(ROOT_DIR, 'logo.jpg')
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -647,7 +890,7 @@ def submit():
             return jsonify({'success': False, 'message': 'Company name is required'})
         
         
-        progress_data = {'percentage': 0}
+        progress_data = {'percentage': 0, 'first_report_number': None}
         result_data = data
         return jsonify({'success': True})
         
@@ -660,13 +903,24 @@ def cancel():
     result_data = None
     return jsonify({'success': True})
 
+@app.route('/close', methods=['POST'])
+def close_app():
+    """Close the application when user clicks close button"""
+    global server_running
+    server_running = False
+    return jsonify({'success': True})
+
 @app.route('/progress', methods=['POST'])
 def update_progress():
     global progress_data
     try:
         data = request.get_json()
         
-        progress_data.update({ 'percentage': data.get('percentage', 0) })
+        update_data = { 'percentage': data.get('percentage', 0) }
+        if 'first_report_number' in data:
+            update_data['first_report_number'] = data['first_report_number']
+        
+        progress_data.update(update_data)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
@@ -684,6 +938,39 @@ def get_dev_settings():
         return jsonify(SYSTEM)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def _db_path():
+    return os.path.join(ROOT_DIR, 'database.json')
+
+def _load_db():
+    try:
+        path = _db_path()
+        if not os.path.exists(path):
+            return {}
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+@app.route('/company-info', methods=['GET'])
+def company_info():
+    try:
+        name = request.args.get('name', '').strip()
+        if not name:
+            return jsonify({'found': False})
+        db = _load_db()
+        entry = db.get(name) or {}
+        if not entry:
+            return jsonify({'found': False})
+        data = entry.get('data') or []
+        return jsonify({
+            'found': True,
+            'first_date': entry.get('first_date'),
+            'last_date': entry.get('last_date'),
+            'count': len(data)
+        })
+    except Exception as e:
+        return jsonify({'found': False, 'error': str(e)}), 200
 
 @app.route('/save-dev-settings', methods=['POST'])
 def save_dev_settings():
@@ -807,6 +1094,7 @@ def get_user_input():
             break
         time.sleep(0.1)
     return result_data
+
 
 if __name__ == "__main__":
     result = get_user_input()
