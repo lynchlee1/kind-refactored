@@ -1,7 +1,3 @@
-"""
-Web-based user interface module
-"""
-
 from flask import Flask, render_template_string, request, jsonify, send_from_directory
 import webbrowser
 import threading
@@ -11,7 +7,7 @@ import os
 import socket
 import threading
 import time
-from settings import get
+from modules.settings import get
 import json
 
 app = Flask(__name__)
@@ -378,7 +374,8 @@ HTML_TEMPLATE = '''
                 <button id="backBtn" type="button" class="btn btn-secondary" onclick="goBack()">이전</button>
                 <button id="devBtn" type="button" class="btn btn-secondary" onclick="toggleDevMode()" style="display:none">개발자 설정</button>
                 <button id="runBtn" type="submit" class="btn btn-primary" style="display:none">실행</button>
-                <button id="nextBtn" type="button" class="btn btn-primary" onclick="goNext()">다음</button>
+                <button id="nextBtn" type="button" class="btn btn-primary" onclick="goNext()">전환내역</button>
+                <button id="convBtn" type="button" class="btn btn-primary" onclick="goNext('conv')">전환가액</button>
                 <button id="recordsBtn" type="button" class="btn btn-primary" onclick="openRecords()" style="display:none">기록 보기</button>
                 <button id="closeBtn" type="button" class="btn btn-secondary" onclick="closeApplication()" style="display:none">닫기</button>
             </div>
@@ -421,7 +418,8 @@ HTML_TEMPLATE = '''
                 company_name: formData.get('company'),
                 from_date: formData.get('fromDate'),
                 to_date: formData.get('toDate'),
-                headless: formData.has('headless')
+                headless: formData.has('headless'),
+                mode: (new URL(window.location.href)).searchParams.get('mode') || 'hist'
             };
             
             // Validate dates
@@ -436,8 +434,6 @@ HTML_TEMPLATE = '''
             document.querySelector('.progress-container').style.display = 'block';
             document.querySelector('.button-group').style.display = 'none';
             
-            checkForCompletion();
-            
             fetch('/submit', {
                 method: 'POST',
                 headers: {
@@ -448,6 +444,8 @@ HTML_TEMPLATE = '''
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
+                    // start polling only after server accepted submission
+                    setTimeout(checkForCompletion, 150);
                 } else {
                     showStatus('Error: ' + result.message, 'error');
                     document.querySelector('.progress-container').style.display = 'none';
@@ -513,6 +511,9 @@ HTML_TEMPLATE = '''
             const url = new URL(window.location.href);
             url.pathname = '/records';
             if (company) url.searchParams.set('company', company);
+            // pass mode from query if present
+            const mode = getQueryParam('mode') || 'hist';
+            url.searchParams.set('mode', mode);
             if (round && round.trim().length > 0) url.searchParams.set('round', round.trim());
             window.location.href = url.toString();
         }
@@ -527,11 +528,17 @@ HTML_TEMPLATE = '''
             if (dateRow) dateRow.style.display = hasCompany ? 'grid' : 'none';
             if (headlessRow) headlessRow.style.display = hasCompany ? 'flex' : 'none';
         });
-        function goNext() {
+        function goNext(mode){
             const name = document.getElementById('company').value.trim();
             if (!name) return;
             const url = new URL(window.location.href);
             url.searchParams.set('company', name);
+            if (mode && typeof mode === 'string') {
+                url.searchParams.set('mode', mode);
+            } else if (!url.searchParams.get('mode')) {
+                url.searchParams.set('mode', 'hist');
+            }
+            // Always navigate to ensure second page is shown
             window.location.href = url.toString();
         }
         function initCompanyView() {
@@ -541,11 +548,20 @@ HTML_TEMPLATE = '''
             const runBtn = document.getElementById('runBtn');
             const devBtn = document.getElementById('devBtn');
             const nextBtn = document.getElementById('nextBtn');
+            const convBtn = document.getElementById('convBtn');
             const backBtn = document.getElementById('backBtn');
             const dateRow = document.getElementById('dateRow');
             const headlessRow = document.getElementById('headlessRow');
             const companyGroup = document.getElementById('companyGroup');
             const recordsBtn = document.getElementById('recordsBtn');
+
+            // ensure mode is set in URL
+            const currentUrl = new URL(window.location.href);
+            if (!currentUrl.searchParams.get('mode')) {
+                currentUrl.searchParams.set('mode', 'hist');
+                window.history.replaceState({}, '', currentUrl.toString());
+            }
+            const mode = currentUrl.searchParams.get('mode') || 'hist';
 
             if (company) {
                 companyInput.value = company;
@@ -553,6 +569,7 @@ HTML_TEMPLATE = '''
                 runBtn.style.display = 'inline-block';
                 devBtn.style.display = 'inline-block';
                 nextBtn.style.display = 'none';
+                if (convBtn) convBtn.style.display = 'none';
                 if (backBtn) backBtn.style.display = 'inline-block';
                 if (recordsBtn) recordsBtn.style.display = 'inline-block';
                 if (dateRow) dateRow.style.display = 'grid';
@@ -568,7 +585,7 @@ HTML_TEMPLATE = '''
                 const todayStr = `${yyyy}-${mm}-${dd}`;
                 if (toInput) toInput.value = todayStr;
 
-                fetch(`/company-info?name=${encodeURIComponent(company)}`)
+                fetch(`/company-info?name=${encodeURIComponent(company)}&mode=${encodeURIComponent(mode)}`)
                     .then(r => r.json())
                     .then(info => {
                         if (info && info.found) {
@@ -588,6 +605,7 @@ HTML_TEMPLATE = '''
                 runBtn.style.display = 'none';
                 devBtn.style.display = 'none';
                 nextBtn.style.display = 'inline-block';
+                if (convBtn) convBtn.style.display = 'inline-block';
                 if (backBtn) backBtn.style.display = 'none';
                 if (recordsBtn) recordsBtn.style.display = 'none';
                 infoPanel.style.display = 'none';
@@ -622,11 +640,11 @@ HTML_TEMPLATE = '''
                         const sortedEntries = Object.entries(settings).sort(([keyA], [keyB]) => {
                             // Define characteristic groups for better organization
                             const groups = {
-                                'time': ['buffer_time', 'short_loadtime', 'long_loadtime', 'load_timeout', 'timeout'],
-                                'wait': ['short_waitcount', 'long_waitcount'],
+                                'time': ['buffer_time', 'short_loadtime', 'long_loadtime'],
+                                'wait': ['waitcount', 'timeout'],
                                 'date': ['from_date_selector', 'to_date_selector'],
-                                'form': ['reset_selector', 'company_input_selector'],
-                                'navigation': ['market_measures_selector', 'new_stock_selector', 'search_button_selector', 'next_page_selector'],
+                                'form': ['reset_selector', 'company_input_selector', 'keyword_input_selector'],
+                                'navigation': ['search_button_selector', 'next_page_selector'],
                                 'content': ['result_row_selector', 'table_selector', 'iframe_selector', 'first_idx_selector']
                             };
                             
@@ -732,31 +750,43 @@ HTML_TEMPLATE = '''
         
         function showCompletion() {
             updateProgressBar(100);
-            document.querySelector('.progress-container').style.display = 'none';
-            document.querySelector('.button-group').style.display = 'flex';
-            
-            // Show close button and hide other buttons
+            const progressContainer = document.querySelector('.progress-container');
+            if (progressContainer) progressContainer.style.display = 'none';
+            const buttonGroup = document.querySelector('.button-group');
+            if (buttonGroup) buttonGroup.style.display = 'flex';
+
             const runBtn = document.getElementById('runBtn');
             const devBtn = document.getElementById('devBtn');
             const nextBtn = document.getElementById('nextBtn');
             const backBtn = document.getElementById('backBtn');
+            const convBtn = document.getElementById('convBtn');
             const recordsBtn = document.getElementById('recordsBtn');
             const closeBtn = document.getElementById('closeBtn');
-            
+
             if (runBtn) runBtn.style.display = 'none';
             if (devBtn) devBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'inline-block';
+            if (convBtn) convBtn.style.display = 'inline-block';
+            if (recordsBtn) recordsBtn.style.display = 'none';
             if (backBtn) backBtn.style.display = 'none';
-            if (recordsBtn) recordsBtn.style.display = 'inline-block';
-            if (closeBtn) closeBtn.style.display = 'inline-block';
+            if (closeBtn) closeBtn.style.display = 'none';
 
-            // Hide original form sections
+            // Go to FIRST page state
             const companyGroup = document.getElementById('companyGroup');
             const dateRow = document.getElementById('dateRow');
             const headlessRow = document.getElementById('headlessRow');
-            if (companyGroup) companyGroup.style.display = 'none';
+            const companyInfo = document.getElementById('companyInfo');
+            if (companyGroup) companyGroup.style.display = 'block';
             if (dateRow) dateRow.style.display = 'none';
             if (headlessRow) headlessRow.style.display = 'none';
+            if (companyInfo) { companyInfo.style.display = 'none'; companyInfo.innerHTML = ''; }
+
+            // Remove company from URL
+            const url = new URL(window.location.href);
+            url.searchParams.delete('company');
+            window.history.replaceState({}, '', url.toString());
+            const input = document.getElementById('company');
+            if (input) input.value = '';
         }
         
         function checkForCompletion() {
@@ -791,6 +821,7 @@ progress_data = {
     'percentage': 0,
     'first_report_number': None
 }
+ui_opened = False
 
 def find_available_port(start_port=5000):
     for port in range(start_port, start_port + 100):
@@ -810,8 +841,9 @@ def index():
 def records():
     try:
         company = request.args.get('company', '')
+        mode = (request.args.get('mode') or 'hist').strip().lower()
         round_filter = (request.args.get('round') or '').strip()
-        db_path = os.path.join(ROOT_DIR, 'database.json')
+        db_path = _db_path(mode)
         data = {}
         if os.path.exists(db_path):
             with open(db_path, 'r', encoding='utf-8') as f:
@@ -856,7 +888,7 @@ def records():
         html = f"""
         <html><head>
         <meta charset='utf-8'>
-        <title>기록 보기 - {company_key}</title>
+        <title>기록 보기 - {company_key} ({'전환/행사가액' if mode=='prc' else '전환기록'})</title>
         <style>
         body{{font-family:'Segoe UI','Malgun Gothic',Arial,sans-serif;padding:20px;background:#f5f7fb;}}
         h2{{margin-bottom:16px;color:#2c3e50;}}
@@ -876,7 +908,7 @@ def records():
         th:nth-child(4), th:nth-child(5), th:nth-child(6), th:nth-child(7), th:nth-child(8){{text-align:right;}}
         </style></head><body>
         <div class='topbar'>
-          <h2>기록 보기 - {company_key}</h2>
+          <h2>기록 보기 - {company_key} ({'PRC' if mode=='prc' else 'HIST'})</h2>
           <div class='filter'>
             <input id='roundInput' class='input' type='text' placeholder='회차 입력 (엔터로 검색)' value='{round_filter}'>
             <button class='btn' onclick="applyFilter()">입력</button>
@@ -963,17 +995,37 @@ def check_status():
 def get_dev_settings():
     """Get developer settings"""
     try:
-        from settings import SYSTEM
+        from modules.settings import SYSTEM
         return jsonify(SYSTEM)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def _db_path():
-    return os.path.join(ROOT_DIR, 'database.json')
-
-def _load_db():
+def _db_path(mode='hist'):
     try:
-        path = _db_path()
+        m = (mode or 'hist').strip().lower()
+        # Try generic files.saved_json_<mode>
+        key = f'saved_json_{m}'
+        try:
+            path = get(key)
+            if path:
+                return os.path.join(ROOT_DIR, path)
+        except Exception:
+            pass
+        # Fallback to hist DB from settings
+        try:
+            path = get('saved_json_hist')
+            if path:
+                return os.path.join(ROOT_DIR, path)
+        except Exception:
+            pass
+        # Final fallback to conventional filenames
+        return os.path.join(ROOT_DIR, f'database_{m}.json' if m else 'database_hist.json')
+    except Exception:
+        return os.path.join(ROOT_DIR, 'database_hist.json')
+
+def _load_db(mode='hist'):
+    try:
+        path = _db_path(mode)
         if not os.path.exists(path):
             return {}
         with open(path, 'r', encoding='utf-8') as f:
@@ -985,9 +1037,10 @@ def _load_db():
 def company_info():
     try:
         name = request.args.get('name', '').strip()
+        mode = (request.args.get('mode') or 'hist').strip().lower()
         if not name:
             return jsonify({'found': False})
-        db = _load_db()
+        db = _load_db(mode)
         entry = db.get(name) or {}
         if not entry:
             return jsonify({'found': False})
@@ -1012,7 +1065,6 @@ def save_dev_settings():
             timing = data.get('timing', {}) or {}
             numeric_keys = [
                 'buffer_time', 'short_loadtime', 'long_loadtime',
-                'long_waitcount', 'short_waitcount', 'load_timeout', 'timeout'
             ]
             for key in numeric_keys:
                 if key in timing:
@@ -1043,50 +1095,44 @@ def save_dev_settings():
 
 @app.route('/reset-dev-settings', methods=['POST'])
 def reset_dev_settings():
-    """Reset developer settings to default"""
     try:
-        # Load default settings from backup or recreate them
         default_settings = {
-            "urls": {
-                "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
-            },
-            "files": {
-                "output_json_file": "details_links.json",
-                "output_excel_file": "results.xlsx"
-            },
-            "application": {
-                "target_keywords": ["CB", "EB", "BW"]
-            },
             "defaults": {
                 "company_name": "",
-                "from_date": "2025-09-16",
-                "to_date": "2025-09-30"
+                "from_date": "2025-09-01",
+                "to_date": ""
             },
-            "timing": {
-                "buffer_time": 0.5,
-                "short_loadtime": 2,
-                "long_loadtime": 3,
-                "long_waitcount": 10,
-                "short_waitcount": 10,
-                "load_timeout": 10,
-                "timeout": 1
+            "files": {
+                "results_json": "results.json",
+                "saved_json_hist": "database_hist.json",
+                "saved_json_prc": "database_prc.json"
             },
             "selectors": {
-                "reset_selector": "#bfrDsclsType",
-                "market_measures_selector": "//a[contains(text(), '시장조치') or contains(@title, '시장조치')]",
-                "new_stock_selector": "//input[@type='checkbox']/following-sibling::*[contains(text(), '신규/추가/변경/재상장')]/preceding-sibling::input[@type='checkbox']",
-                "search_button_selector": "//form[@id='searchForm']//section[contains(@class, 'search-group')]//div[@class='btn-group type-bt']//a[contains(@class, 'search-btn')]",
-                "result_row_selector": "table.list.type-00",
                 "company_input_selector": "#AKCKwd",
                 "from_date_selector": "input[name='fromDate']",
                 "to_date_selector": "input[name='toDate']",
-                "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
-                "table_selector": "table, iframe",
+                "keyword_input_selector": "#reportNmTemp",
+                "reset_selector": "#bfrDsclsType",
+                "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc",
                 "iframe_selector": "iframe[name='docViewFrm']",
-                "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc"
+                "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
+                "result_row_selector": "table.list.type-00",
+                "search_button_selector": "#searchForm > section.search-group.type-00 > div > div.btn-group.type-bt > a.btn-sprite.type-00.vmiddle.search-btn",
+                "table_selector": "table, iframe"
+            },
+            "timing": {
+                "buffer_time": 0.4,
+                "long_loadtime": 3,
+                "short_loadtime": 2,
+                "waitcount": 10,
+                "timeout": 1
+            },
+            "urls": {
+                "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
+            },
+            "others": {
             }
         }
-        
         with open('system_constants.json', 'w', encoding='utf-8') as f:
             import json
             json.dump(default_settings, f, indent=2, ensure_ascii=False)
@@ -1109,25 +1155,35 @@ def start_server():
     app.run(host='127.0.0.1', port=current_port, debug=False, use_reloader=False)
 
 def get_user_input():
-    global result_data, server_running, current_port
+    global result_data, server_running, current_port, ui_opened
     
-    server_thread = threading.Thread(target=start_server)
-    server_thread.daemon = True
-    server_thread.start()
+    # Start server only if not already running
+    if not server_running:
+        server_thread = threading.Thread(target=start_server)
+        server_thread.daemon = True
+        server_thread.start()
     
-    time.sleep(get("buffer_time"))
-    if current_port: webbrowser.open(f'http://127.0.0.1:{current_port}')
-    else: return None
+    # Wait briefly for the server to report its port
+    start_time = time.time()
+    while not current_port and time.time() - start_time < 5:
+        time.sleep(0.05)
+    
+    # Open the UI exactly once
+    if current_port and not ui_opened:
+        webbrowser.open(f'http://127.0.0.1:{current_port}')
+        ui_opened = True
+    elif not current_port:
+        return None
     while server_running:
         if result_data is not None:
             break
         time.sleep(0.1)
-    return result_data
-
+    # Return once per submission; clear cached data to avoid re-runs
+    result = result_data
+    result_data = None
+    return result
 
 if __name__ == "__main__":
     result = get_user_input()
-    if result:
-        print("User input:", result)
-    else:
-        print("User cancelled")
+    if result: print("User input:", result)
+    else: print("User cancelled")

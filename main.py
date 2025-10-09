@@ -1,51 +1,81 @@
-import modules.web_ui as web_ui
-from modules.web_ui import get_user_input
-import json, os, time, threading
-from modules.process_data import process_to_json
+import designlib.web_ui as web_ui
+from designlib.web_ui import get_user_input
+import time
 from modules.progress_tracker import update_progress
-from scraping.kind_scraper import KINDScraper
+from modules.kind_scraper import KINDScraper
+from modules.search_modes import get_search_mode
+
+def run_once(user_input):
+    mode = user_input.get('mode', 'hist')
+    search_mode = get_search_mode(mode)
+    if not search_mode:
+        raise Exception(f"❌ Unknown search mode: {mode}")
+
+    keyword = search_mode.keyword
+    config = {
+        'from_date': user_input['from_date'],
+        'to_date': user_input['to_date'],
+        'company': user_input['company_name'],
+        'keyword': keyword
+    }
+
+    scraper = KINDScraper(
+        config=config,
+        headless=user_input['headless'],
+        process_type=mode
+    )
+
+    items = scraper.run()
+
+    # Process data using mode-specific processor
+    config = {
+        'from_date': user_input['from_date'],
+        'to_date': user_input['to_date'],
+        'mode': mode
+    }
+
+    data_processor = search_mode.data_processor_class()
+
+    from modules.settings import get
+    import json
+    input_json = get("results_json")
+    with open(input_json, 'r', encoding='utf-8') as f:
+        raw_items = json.load(f)
+
+    processed_data = data_processor.process_raw_data(raw_items)
+
+    # Prepare config for save_to_database method
+    save_config = {
+        'company': user_input['company_name'],
+        'processed_data': processed_data,
+        'key_list': search_mode.columns,
+        'from_date': user_input['from_date'],
+        'to_date': user_input['to_date']
+    }
+
+    data_processor.save_to_database(save_config)
+    update_progress(100)
+    print(f"✅ {search_mode.display_name} 작업이 완료되었습니다!")
+    time.sleep(1)
 
 def main():
     try:
-        user_input = get_user_input()
-        if not user_input: return
-
-        scraper = KINDScraper(
-            company_name=user_input['company_name'],
-            from_date=user_input['from_date'],
-            to_date=user_input['to_date'],
-            headless=user_input['headless']
-        )
-        items = scraper.run()
-        if items:
-            process_to_json({
-                'from_date': user_input['from_date'],
-                'to_date': user_input['to_date']
-            })
-            
-            update_progress(100)
-            print("✅ 모든 작업이 완료되었습니다!")
-            
-            time.sleep(2)
-        else:
-            # No items found - still set to 100%
-            update_progress(100)
-            print("⚠️ 검색 결과가 없습니다.")
-            time.sleep(2)
-            
+        # Loop to support multiple runs until the UI is closed
+        while True:
+            user_input = get_user_input()
+            if not user_input:
+                break
+            try:
+                run_once(user_input)
+            except Exception as e:
+                print(f"(오류) 데이터 처리 실패: {e}")
+                update_progress(100)
+                time.sleep(1)
+        print("프로그램을 종료합니다.")
     except Exception as e: 
-        print(f"❌ Scraping failed: {e}")
-        # Even on error, set to 100%
+        print(f"(오류) 실행 실패: {e}")
         update_progress(100)
-        time.sleep(2)
-        
-    # Keep the web UI running until user clicks Close button
-    print("웹 인터페이스가 열려있습니다. '닫기' 버튼을 눌러 종료하세요.")
-    
-    # Keep the main thread alive so the web UI continues running
-    while getattr(web_ui, 'server_running', False):
         time.sleep(1)
-    print("프로그램을 종료합니다.")
 
 if __name__ == "__main__":  
     main()
