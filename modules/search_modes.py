@@ -87,10 +87,10 @@ class BaseDataProcessor(ABC):
     
     def _update_date_ranges(self, db, company_name, existing_entry, fd_new, ld_new, merged_data, db_filename):
         # Use the search date ranges as first_date and last_date (not actual data dates)
-        # For refresh operations, preserve original search ranges if provided
+        # For refresh operations, preserve original first_date but update last_date to today
         if hasattr(self, '_preserve_original_ranges') and self._preserve_original_ranges:
-            fd_fin = getattr(self, '_original_first_date', fd_new)
-            ld_fin = getattr(self, '_original_last_date', ld_new)
+            fd_fin = getattr(self, '_original_first_date', fd_new)  # Preserve original first_date
+            ld_fin = ld_new  # Update last_date to today's date (from refresh search)
         else:
             fd_fin = fd_new  # Search from_date
             ld_fin = ld_new  # Search to_date
@@ -140,23 +140,43 @@ class PrcDataProcessor(BaseDataProcessor):
                 company_name = item.get('company', '')
                 date = item.get('date', '')
                 table_data = item.get('table_data', [])
-                report_data = table_data[0]['rows']
                 
-                if len(report_data[1].get('data', [])) >= 4:
-                    row_data = report_data[1]['data']
-                    print("row_data", row_data)
-                    round_val = str(row_data[0]).strip()
-                    prev_prc = str(row_data[2]).strip()
-                    issue_price = str(row_data[3]).strip()
-                    print("round_val", round_val, "prev_prc", prev_prc, "issue_price", issue_price)
-                    processed_data.append({
-                        'company': company_name,
-                        'date': date,
-                        'round': round_val,
-                        'prev_prc': prev_prc,
-                        'issue_price': issue_price
-                    })
-            except Exception as e: continue
+                # Handle the table structure correctly
+                if len(table_data) > 0 and 'rows' in table_data[0]:
+                    report_data = table_data[0]['rows']
+                    
+                    # Find the price adjustment section (section 1)
+                    in_price_section = False
+                    for i in range(len(report_data)):
+                        row_data = report_data[i]['data']
+                        
+                        # Check if this is the start of price adjustment section
+                        if len(row_data) > 0 and "조정전 전환가액" in str(row_data[0]):
+                            in_price_section = True
+                            continue
+                        
+                        # Check if we've moved to the next section (share count section)
+                        if len(row_data) > 0 and "전환가능주식수" in str(row_data[0]):
+                            in_price_section = False
+                            continue
+                        
+                        # Process rows only in the price adjustment section
+                        if in_price_section and len(row_data) >= 4:
+                            round_val = str(row_data[0]).strip()
+                            # Skip header rows and non-numeric rounds
+                            if round_val.isdigit():
+                                prev_prc = str(row_data[2]).strip()
+                                issue_price = str(row_data[3]).strip()
+                                processed_data.append({
+                                    'company': company_name,
+                                    'date': date,
+                                    'round': round_val,
+                                    'prev_prc': prev_prc,
+                                    'issue_price': issue_price
+                                })
+            except Exception as e: 
+                print(f"⚠️ Error processing PRC item: {e}")
+                continue
         return processed_data
 
 class SearchMode:    

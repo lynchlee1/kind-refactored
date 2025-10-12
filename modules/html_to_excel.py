@@ -10,6 +10,69 @@ except ImportError:
     sys.path.append(os.path.dirname(__file__))
     from settings import get
 
+def get_latest_cumulative_values(company_name, hist_df):
+    try:
+        company_data = hist_df[hist_df['회사명'] == company_name]
+        if company_data.empty: return (0, 0)
+        
+        # Get the most recent entry (first row after sorting by date descending)
+        latest_entry = company_data.iloc[0]
+        
+        latest_누적_총액 = latest_entry.get('누적_총액', 0)
+        latest_누적_추가주식수 = latest_entry.get('누적_추가주식수', 0)
+        
+        # Convert to int if possible, otherwise return 0
+        try:
+            latest_누적_총액 = int(str(latest_누적_총액).replace(',', '')) if latest_누적_총액 else 0
+        except:
+            latest_누적_총액 = 0
+            
+        try:
+            latest_누적_추가주식수 = int(str(latest_누적_추가주식수).replace(',', '')) if latest_누적_추가주식수 else 0
+        except:
+            latest_누적_추가주식수 = 0
+        
+        return (latest_누적_총액, latest_누적_추가주식수)
+    except Exception as e:
+        print(f"⚠️ Error getting cumulative values for {company_name}: {e}")
+        return (0, 0)
+
+def get_conversion_price_history(company_name, round_value, prc_df):
+    """
+    Get the conversion price change history for a company and round from PRC data
+    Returns formatted string like "7,905(2024-01-08 13:07), 6,900(2024-11-06 14:12), ..."
+    """
+    try:
+        # Filter PRC data for the specific company and round
+        company_round_data = prc_df[
+            (prc_df['회사명'] == company_name) & 
+            (prc_df['회차'] == str(round_value))
+        ]
+        
+        if company_round_data.empty:
+            return ""
+        
+        # Sort by date (oldest first to show chronological progression)
+        company_round_data = company_round_data.sort_values('날짜', ascending=True)
+        
+        # Create the formatted string
+        price_changes = []
+        for _, row in company_round_data.iterrows():
+            current_price = str(row.get('현재_전환가', '')).strip()
+            date = str(row.get('날짜', '')).strip()
+            
+            # Format the date (remove time if it's just 00:00)
+            if ' 00:00' in date:
+                date = date.replace(' 00:00', '')
+            
+            if current_price and current_price != 'nan' and date and date != 'nan':
+                price_changes.append(f"{current_price}({date})")
+        
+        return ", ".join(price_changes)
+    except Exception as e:
+        print(f"⚠️ Error getting conversion price history for {company_name} {round_value}: {e}")
+        return ""
+
 def read_holdings_from_excel():
     """
     Read company names and rounds from the Holdings sheet in results.xlsx
@@ -242,22 +305,66 @@ def convert_database_to_excel(use_holdings_filter=True):
         with pd.ExcelWriter(output_path, engine='openpyxl', mode='w') as writer:
             # Write the preserved Holdings sheet or create new one
             if existing_holdings_df is not None:
-                # Write the entire Holdings sheet as-is (preserve all custom columns and data)
-                existing_holdings_df.to_excel(writer, sheet_name='Holdings', index=False)
-                print("✅ Preserved existing Holdings sheet with all custom modifications")
+                # Add cumulative values to existing Holdings sheet
+                holdings_with_cumulative = existing_holdings_df.copy()
+                
+                # Add cumulative value columns if they don't exist
+                if '누적_총액' not in holdings_with_cumulative.columns:
+                    holdings_with_cumulative['누적_총액'] = 0
+                if '누적_추가주식수' not in holdings_with_cumulative.columns:
+                    holdings_with_cumulative['누적_추가주식수'] = 0
+                if '전환가_변동내역' not in holdings_with_cumulative.columns:
+                    holdings_with_cumulative['전환가_변동내역'] = ""
+                
+                # Update cumulative values and conversion price history for each company
+                for idx, row in holdings_with_cumulative.iterrows():
+                    company_name = row.get('기업명', '')
+                    round_value = row.get('회차', '')
+                    if company_name:
+                        latest_누적_총액, latest_누적_추가주식수 = get_latest_cumulative_values(company_name, hist_df)
+                        holdings_with_cumulative.loc[idx, '누적_총액'] = latest_누적_총액
+                        holdings_with_cumulative.loc[idx, '누적_추가주식수'] = latest_누적_추가주식수
+                        
+                        # Get conversion price history if round is specified
+                        if round_value:
+                            conversion_history = get_conversion_price_history(company_name, round_value, prc_df)
+                            holdings_with_cumulative.loc[idx, '전환가_변동내역'] = conversion_history
+                
+                holdings_with_cumulative.to_excel(writer, sheet_name='Holdings', index=False)
+                print("✅ Updated existing Holdings sheet with latest cumulative values")
             else:
-                # If no existing file, create Holdings sheet from Holdings data
+                # If no existing file, create Holdings sheet from Holdings data with cumulative values
                 if holdings_data:
                     holdings_df = pd.DataFrame(holdings_data)
                     # Rename columns to match expected format
                     holdings_df = holdings_df.rename(columns={'company_name': '기업명', 'round': '회차'})
+                    
+                    # Add cumulative value and conversion price history columns
+                    holdings_df['누적_총액'] = 0
+                    holdings_df['누적_추가주식수'] = 0
+                    holdings_df['전환가_변동내역'] = ""
+                    
+                    # Update cumulative values and conversion price history for each company
+                    for idx, row in holdings_df.iterrows():
+                        company_name = row.get('기업명', '')
+                        round_value = row.get('회차', '')
+                        if company_name:
+                            latest_누적_총액, latest_누적_추가주식수 = get_latest_cumulative_values(company_name, hist_df)
+                            holdings_df.loc[idx, '누적_총액'] = latest_누적_총액
+                            holdings_df.loc[idx, '누적_추가주식수'] = latest_누적_추가주식수
+                            
+                            # Get conversion price history if round is specified
+                            if round_value:
+                                conversion_history = get_conversion_price_history(company_name, round_value, prc_df)
+                                holdings_df.loc[idx, '전환가_변동내역'] = conversion_history
+                    
                     holdings_df.to_excel(writer, sheet_name='Holdings', index=False)
-                    print("✅ Created new Holdings sheet from Holdings data")
+                    print("✅ Created new Holdings sheet with latest cumulative values")
                 else:
-                    # Fallback: create empty Holdings sheet
-                    empty_holdings_df = pd.DataFrame(columns=['기업명', '회차'])
+                    # Fallback: create empty Holdings sheet with cumulative columns
+                    empty_holdings_df = pd.DataFrame(columns=['기업명', '회차', '누적_총액', '누적_추가주식수', '전환가_변동내역'])
                     empty_holdings_df.to_excel(writer, sheet_name='Holdings', index=False)
-                    print("✅ Created empty Holdings sheet")
+                    print("✅ Created empty Holdings sheet with cumulative columns")
             
             # Create HIST data sheet (using filtered and sorted DataFrame)
             hist_df.to_excel(writer, sheet_name='HIST_Data', index=False)

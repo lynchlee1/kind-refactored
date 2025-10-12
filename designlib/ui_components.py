@@ -130,7 +130,7 @@ class BasicPage:
         for button in buttons:
             button_html += self.element_button(**button)
         return f'''
-        <div class="button-group">
+        <div class="button-group" style="margin-bottom:8px;">
             {button_html}
         </div>
         '''
@@ -493,7 +493,7 @@ class BasicPage:
         }}
 
         .btn-long {{
-            min-width: 420px;
+            min-width: 280px;
         }}
         
         .btn-primary {{

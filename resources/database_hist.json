@@ -1,7 +1,7 @@
 {
   "에스티팜": {
-    "first_date": "2024-01-01",
-    "last_date": "2024-12-31",
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
     "data": [
       {
         "company": "에스티팜",
@@ -160,8 +160,8 @@
     ]
   },
   "한울소재과학": {
-    "first_date": "2024-01-01",
-    "last_date": "2024-12-31",
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
     "data": [
       {
         "company": "한울소재과학",
@@ -327,8 +327,8 @@
     ]
   },
   "녹십자엠에스": {
-    "first_date": "2024-01-01",
-    "last_date": "2024-12-31",
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
     "data": [
       {
         "company": "녹십자엠에스",
@@ -352,5 +352,250 @@
         "issue_price": "5,283"
       }
     ]
+  },
+  "미래나노텍": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
+  },
+  "켄코아에어로스페이스": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2025-02-25 16:09",
+        "round": "7",
+        "additional_shares": "81,327",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2025-02-25 16:09",
+        "round": "7",
+        "additional_shares": "65,061",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2025-02-11 17:04",
+        "round": "7",
+        "additional_shares": "45,136",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2024-01-25 16:04",
+        "round": "7",
+        "additional_shares": "16,590",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2024-01-17 18:38",
+        "round": "7",
+        "additional_shares": "112,231",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-06-02 17:25",
+        "round": "7",
+        "additional_shares": "48,796",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-04-18 17:19",
+        "round": "7",
+        "additional_shares": "97,592",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-04-13 18:10",
+        "round": "7",
+        "additional_shares": "24,398",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-04-13 18:10",
+        "round": "7",
+        "additional_shares": "73,194",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-03-21 16:47",
+        "round": "-",
+        "additional_shares": "24,398",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-03-08 16:39",
+        "round": "7",
+        "additional_shares": "121,990",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-02-27 17:27",
+        "round": "7",
+        "additional_shares": "24,398",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-02-17 17:22",
+        "round": "7",
+        "additional_shares": "48,796",
+        "issue_price": "12,296"
+      },
+      {
+        "company": "켄코아에어로스페이스",
+        "date": "2023-02-13 17:17",
+        "round": "7",
+        "additional_shares": "73,195",
+        "issue_price": "12,296"
+      }
+    ]
+  },
+  "자화전자": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
+  },
+  "상아프론테크": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
+  },
+  "선익시스템": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "선익시스템",
+        "date": "2025-07-23 16:29",
+        "round": "-",
+        "additional_shares": "1,499",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2025-07-23 16:29",
+        "round": "-",
+        "additional_shares": "20,000",
+        "issue_price": "7,770"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2025-01-22 16:18",
+        "round": "-",
+        "additional_shares": "900",
+        "issue_price": "9,829"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2025-01-22 16:18",
+        "round": "-",
+        "additional_shares": "41,700",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2024-04-04 16:30",
+        "round": "-",
+        "additional_shares": "39,840",
+        "issue_price": "9,829"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2024-04-04 16:30",
+        "round": "-",
+        "additional_shares": "9,000",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2024-04-04 16:30",
+        "round": "-",
+        "additional_shares": "4,000",
+        "issue_price": "7,770"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2024-01-22 17:01",
+        "round": "-",
+        "additional_shares": "21,999",
+        "issue_price": "9,829"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2024-01-22 17:01",
+        "round": "-",
+        "additional_shares": "42,800",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-04-25 17:26",
+        "round": "-",
+        "additional_shares": "79,345",
+        "issue_price": "9,829"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-04-25 17:26",
+        "round": "-",
+        "additional_shares": "20,200",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-04-25 17:26",
+        "round": "-",
+        "additional_shares": "6,000",
+        "issue_price": "7,770"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-01-19 16:06",
+        "round": "-",
+        "additional_shares": "3,200",
+        "issue_price": "9,829"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-01-19 16:06",
+        "round": "-",
+        "additional_shares": "15,000",
+        "issue_price": "12,201"
+      },
+      {
+        "company": "선익시스템",
+        "date": "2023-01-19 16:06",
+        "round": "-",
+        "additional_shares": "2,250",
+        "issue_price": "7,770"
+      }
+    ]
+  },
+  "베뉴지": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
+  },
+  "덕우전자": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
+  },
+  "나노신소재": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": []
   }
 }

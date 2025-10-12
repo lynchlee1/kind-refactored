@@ -10,49 +10,105 @@ def main_page():
     page = BasicPage(title="KIND Project", container_width="650px", container_height="700px")
     page.add_element(page.element_header(title="KIND 자동화 프로그램", subtitle="타임폴리오 대체투자본부", show_logo=True, show_subtitle=True))
 
-    buttons = [
+    hist_buttons = [
         {
-            "button_id": "run_hist", "button_text": "추가상장 기록 조회", "button_type": "button", 
-            "button_class": "btn btn-primary btn-long", "onclick": "window.location.href='hist_page.html'", 
-            "style": "width:100%;"
+            "button_id": "refresh_hist", "button_text": "추가상장 내역 최신화", "button_type": "button", 
+            "button_class": "btn btn-primary", "onclick": "refreshDatabase('hist')", 
+            "style": "width:45%;"
         },
         {
-            "button_id": "run_prc", "button_text": "전환가액 변동 조회", "button_type": "button", 
-            "button_class": "btn btn-primary btn-long", "onclick": "window.location.href='prc_page.html'", 
-            "style": "width:100%;"
+            "button_id": "run_hist", "button_text": "개별종목 실행/조회", "button_type": "button", 
+            "button_class": "btn btn-secondary", "onclick": "window.location.href='hist_page.html'", 
+            "style": "width:45%; margin-left: 5px;"
         },
     ]
-    page.add_element(page.element_button_group(buttons))
+    page.add_element(page.element_button_group(hist_buttons))
+    
+    prc_buttons = [
+        {
+            "button_id": "refresh_prc", "button_text": "전환가액 변동내역 최신화", "button_type": "button", 
+            "button_class": "btn btn-primary", "onclick": "refreshDatabase('prc')", 
+            "style": "width:45%;"
+        },
+        {
+            "button_id": "run_prc", "button_text": "개별종목 실행/조회", "button_type": "button", 
+            "button_class": "btn btn-secondary", "onclick": "window.location.href='prc_page.html'", 
+            "style": "width:45%; margin-left: 5px;"
+        },
+    ]
+    page.add_element(page.element_button_group(prc_buttons))
 
-    page.add_element(page.element_button(
-        button_id="dev_mode",
-        button_text="개발자 설정",
-        button_type="button",
-        button_class="btn btn-secondary",
-        onclick="window.location.href='dev_mode.html'",
-        style="position:absolute; right: 20px; bottom: 20px;"
-    ))
+    bottom_buttons = [
+        {
+            "button_id": "dev_mode", "button_text": "개발자 설정", "button_type": "button",
+            "button_class": "btn btn-secondary", "onclick": "window.location.href='dev_mode.html'",
+            "style": "width:45%;"
+        },
+        {
+            "button_id": "export_excel", "button_text": "데이터 Excel 내보내기", "button_type": "button",
+            "button_class": "btn btn-secondary", "onclick": "exportToExcel()",
+            "style": "width:45%; margin-left: 5px;"
+        },
+    ]
+    page.add_element(f'''
+        <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%;">
+            {page.element_button_group(bottom_buttons)}
+        </div>
+    ''')
     
-    page.add_element(page.element_button(
-        button_id="excel_update",
-        button_text="보유자산 업데이트",
-        button_type="button",
-        button_class="btn btn-primary",
-        onclick="refreshHoldingsFromExcel()",
-        style="position:absolute; right: 20px; bottom: 80px;"
-    ))
-    
-    page.add_element(page.element_button(
-        button_id="export_excel",
-        button_text="데이터 Excel 내보내기",
-        button_type="button",
-        button_class="btn btn-success",
-        onclick="exportToExcel()",
-        style="position:absolute; right: 20px; bottom: 140px;"
-    ))
-    
-    # Add Excel functionality script
     page.add_script('''
+        async function refreshDatabase(mode) {
+            const modeText = mode === 'hist' ? '추가상장 기록 조회' : '전환가액 변동 조회';
+            if (confirm(`${modeText} 데이터베이스를 최신화하시겠습니까?\\n\\n1. 보유자산 업데이트 (Excel에서 Holdings 목록 업데이트)\\n2. Holdings 목록의 기업들에 대해 마지막 날짜부터 오늘까지의 데이터를 새로 수집합니다.`)) {
+                try {
+                    // Step 1: Update holdings from Excel first
+                    console.log('Step 1: Updating holdings from Excel...');
+                    const holdingsResponse = await fetch('/api/refresh-holdings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    const holdingsResult = await holdingsResponse.json();
+                    
+                    if (!holdingsResult.success) {
+                        alert('보유자산 업데이트 실패: ' + holdingsResult.message + '\\n\\n데이터베이스 최신화를 계속 진행합니다.');
+                    } else {
+                        console.log('Holdings updated:', holdingsResult.holdings);
+                    }
+                    
+                    // Step 2: Run database refresh
+                    console.log('Step 2: Starting database refresh...');
+                    const response = await fetch(`/api/run/run_${mode}_scraper`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            company_name: 'holdings_refresh',  // Special flag for holdings-based refresh
+                            from_date: '2023-01-01',
+                            to_date: '2025-01-01',
+                            headless: true,
+                            refresh_mode: true
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert(`${modeText} 데이터베이스 최신화가 시작되었습니다.\\n\\n1. 보유자산 업데이트 완료\\n2. Holdings 목록의 모든 기업에 대해 백그라운드에서 실행되며 완료되면 데이터가 업데이트됩니다.`);
+                    } else {
+                        alert(`${modeText} 데이터베이스 최신화 실패: ` + result.message);
+                    }
+                } catch (error) {
+                    console.error('데이터베이스 최신화 오류:', error);
+                    alert('데이터베이스 최신화 중 오류가 발생했습니다: ' + error.message);
+                }
+            }
+        }
+        
         async function refreshHoldingsFromExcel() {
             if (confirm('Excel 파일(results.xlsx)에서 Holdings 목록을 업데이트하시겠습니까?')) {
                 try {
@@ -485,8 +541,8 @@ def execution_setup_page(config):
     page.add_element(page.element_info_panel())
     buttons = [
         {"button_id": "runBtn", "button_text": "실행", "button_type": "submit", "button_class": "btn btn-primary"},
-        {"button_id": "refreshBtn", "button_text": "데이터베이스 최신화", "button_type": "button", "button_class": "btn btn-primary", "onclick": "refreshDatabase()"},
-        {"button_id": "dbBtn", "button_text": "데이터베이스 조회", "button_type": "button", "button_class": "btn btn-secondary", "onclick": "checkDatabaseFromInput()"}
+        {"button_id": "dbBtn", "button_text": "데이터베이스 조회", "button_type": "button", "button_class": "btn btn-secondary", "onclick": "checkDatabaseFromInput()"},
+        {"button_id": "discardBtn", "button_text": "버리기", "button_type": "button", "button_class": "btn btn-danger", "onclick": "discardCompanyData()"}
     ]
     page.add_element(page.element_button_group(buttons))
     page.add_element(page.element_button(
@@ -520,10 +576,22 @@ def execution_setup_page(config):
         document.addEventListener('DOMContentLoaded', () => {
             const allCheck = document.getElementById('all_companies');
             const corpInput = document.getElementById('corp_name');
+            const discardBtn = document.getElementById('discardBtn');
+            
             function syncCorpInputState() {
                 const disabled = allCheck.checked;
                 corpInput.disabled = disabled;
                 corpInput.style.background = disabled ? '#e9ecef' : '#f8f9fa';
+                
+                // Enable/disable discard button based on company selection
+                discardBtn.disabled = disabled;
+                if (disabled) {
+                    discardBtn.style.opacity = '0.5';
+                    discardBtn.style.cursor = 'not-allowed';
+                } else {
+                    discardBtn.style.opacity = '1';
+                    discardBtn.style.cursor = 'pointer';
+                }
             }
             allCheck.addEventListener('change', syncCorpInputState);
             syncCorpInputState();
@@ -614,44 +682,49 @@ def execution_setup_page(config):
             return executeRunFunction();
         }
         
-        function refreshDatabase() {
-            const headless = document.getElementById('headless').checked;
+        async function discardCompanyData() {
+            const corpInput = document.getElementById('corp_name');
+            const allCompaniesCheck = document.getElementById('all_companies');
+            const companyName = corpInput.value.trim();
+            
+            if (!companyName && !allCompaniesCheck.checked) {
+                alert('회사명을 입력하거나 "전체 기업 선택하기"를 체크해주세요.');
+                return;
+            }
+            
+            if (allCompaniesCheck.checked) {
+                alert('개별 회사 데이터를 삭제하려면 "전체 기업 선택하기"를 해제하고 회사명을 입력해주세요.');
+                return;
+            }
             
             const urlParams = new URLSearchParams(window.location.search);
             const currentMode = urlParams.get('mode') || 'hist';
+            const modeText = currentMode === 'hist' ? '추가상장 기록' : '전환가액 변동';
             
-            // Prepare parameters for refresh function
-            const params = {
-                company_name: '전체 기업',  // Always use all companies for refresh
-                from_date: '2024-01-01',    // Will be overridden by each company's last_date
-                to_date: '2025-12-31',      // Will be overridden by today's date
-                headless: headless,
-                mode: currentMode,
-                refresh_mode: true  // Flag to indicate this is a refresh operation
-            };
-            
-            if (CONFIG.runFunction) {
-                alert(`데이터베이스 최신화를 시작합니다.\\n\\n모든 기업의 최신 데이터를 수집합니다.\\n각 기업의 마지막 날짜부터 오늘까지 자동으로 설정됩니다.\\n\\n실행 함수: ${CONFIG.runFunction}`);
-                
-                // Make API call to execute the refresh function
-                fetch(`/api/run/${CONFIG.runFunction}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(params)
-                })
-                .then(response => response.json())
-                .then(result => {
+            if (confirm(`정말로 "${companyName}"의 ${modeText} 데이터를 삭제하시겠습니까?\\n\\n이 작업은 되돌릴 수 없습니다.`)) {
+                try {
+                    const response = await fetch(`/api/discard-company-data`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            company_name: companyName,
+                            mode: currentMode
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
                     if (result.success) {
-                        alert(`${CONFIG.runFunction} 데이터베이스 최신화가 시작되었습니다.`);
+                        alert(`${companyName}의 ${modeText} 데이터가 성공적으로 삭제되었습니다.`);
                     } else {
-                        alert(`오류: ${result.message}`);
+                        alert(`데이터 삭제 실패: ${result.message}`);
                     }
-                })
-                .catch(error => {
-                    alert(`API 호출 오류: ${error.message}`);
-                });
-            } else {
-                alert('데이터베이스 최신화 기능이 구현되지 않았습니다.');
+                } catch (error) {
+                    console.error('데이터 삭제 오류:', error);
+                    alert('데이터 삭제 중 오류가 발생했습니다: ' + error.message);
+                }
             }
         }
         
