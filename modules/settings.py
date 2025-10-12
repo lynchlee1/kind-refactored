@@ -8,8 +8,12 @@ class Settings:
     
     def _get_resource_path(self, relative_path):
         try: base_path = sys._MEIPASS
-        except AttributeError: base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return os.path.join(base_path, relative_path)
+        except AttributeError: 
+            # Get the directory containing this file (modules/)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Go up one level to the project root
+            base_path = os.path.dirname(current_dir)
+        return os.path.join(base_path, 'resources', relative_path)
     
     def load_system_constants(self):
         try:

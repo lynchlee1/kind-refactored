@@ -1,14 +1,4 @@
 {
-  "defaults": {
-    "company_name": "",
-    "from_date": "2025-09-01",
-    "to_date": ""
-  },
-  "files": {
-    "results_json": "results.json",
-    "saved_json_hist": "database_hist.json",
-    "saved_json_prc": "database_prc.json"
-  },
   "selectors": {
     "company_input_selector": "#AKCKwd",
     "from_date_selector": "input[name='fromDate']",
@@ -31,7 +21,5 @@
   },
   "urls": {
     "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
-  },
-  "others": {
   }
 }

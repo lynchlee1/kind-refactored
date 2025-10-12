@@ -7,7 +7,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from .settings import get
-from .progress_tracker import update_progress
 from .search_modes import get_search_mode
 
 # Driver setup imports
@@ -77,8 +76,8 @@ class KINDScraper:
     
     def _click_button_CSS(self, selector):
         try:
-            button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-            button.click()
+            button = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+            self.driver.execute_script("arguments[0].click();", button)
             print(f"✅ CSS {selector} 버튼 클릭 완료")
             time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ CSS {selector} 클릭 실패: {e}")
@@ -150,11 +149,8 @@ class KINDScraper:
             while True:
                 result_rows = self._find_result_rows(self.driver)                
                 if not result_rows: break
-                page_results = self._process_page_rows(result_rows, page_num)
+                page_results = self._process_page_rows(result_rows)
                 all_results.extend(page_results)
-                progress = len(all_results) / (first_report_number or 1) * 100
-                update_progress(progress, first_report_number)
-
                 if not self._click_next_page(): break # End of results
                 page_num += 1
                 time.sleep(get("buffer_time"))
@@ -170,18 +166,18 @@ class KINDScraper:
             return first_report_number
         except Exception: return None
 
-    def _process_page_rows(self, result_rows, page_num):
+    def _process_page_rows(self, result_rows):
         page_results = []
         for idx, row in enumerate(result_rows):
             try:
-                row_data = self._process_single_row(row, idx, page_num)
+                row_data = self._process_single_row(row)
                 if row_data is not None: page_results.append(row_data)
             except Exception as e: 
                 print(f"❌ 행 처리 중 오류: {e}")
                 continue
         return page_results
 
-    def _process_single_row(self, row, row_idx, page_num):
+    def _process_single_row(self, row):
         try:
             row_data = self._extract_row_basic_data(row)
             if not self._should_process_row(row_data):
@@ -248,6 +244,7 @@ class KINDScraper:
     def _should_process_row(self, row_data):
         try:
             search_mode = get_search_mode(self.process_type)
+            if not search_mode.keywords_list: return True
             title = row_data.get('title')
             return any(keyword in title for keyword in search_mode.keywords_list)
         except Exception as e: return False

@@ -1,16 +1,29 @@
 import json
 import os
+import sys
 from abc import ABC, abstractmethod
-from .settings import get
+
+try:
+    from .settings import get
+except ImportError:
+    sys.path.append(os.path.dirname(__file__))
+    from settings import get
+
+try:
+    from ..designlib.ui_components import BasicPage
+    from ..designlib.generate_pages_simple import execution_setup_page
+except ImportError:
+    parent_dir = os.path.dirname(os.path.dirname(__file__))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    from designlib.ui_components import BasicPage  # type: ignore
+    from designlib.generate_pages_simple import execution_setup_page  # type: ignore
 
 class BaseDataProcessor(ABC):
     def __init__(self, mode_name): self.mode_name = mode_name
         
     @abstractmethod
     def process_raw_data(self, items): pass
-    
-    @abstractmethod
-    def get_database_filename(self): pass
     
     def save_to_database(self, config):
         try:
@@ -19,11 +32,19 @@ class BaseDataProcessor(ABC):
             key_list = config.get('key_list')
             fd_new = config.get('from_date')
             ld_new = config.get('to_date')
+            db_filename = config.get('db_filename')
+            
+            # Debug and validate required parameters
+            if not db_filename:
+                raise Exception(f"❌ db_filename is required but got: {repr(db_filename)}")
+            if not company_name:
+                raise Exception(f"❌ company_name is required but got: {repr(company_name)}")
+            if not key_list:
+                raise Exception(f"❌ key_list is required but got: {repr(key_list)}")
             
             modules_dir = os.path.dirname(os.path.abspath(__file__))
             root_dir = os.path.dirname(modules_dir)
-            db_filename = self.get_database_filename()
-            db_path = os.path.join(root_dir, db_filename)
+            db_path = os.path.join(root_dir, 'resources', db_filename)
             
             try:
                 with open(db_path, 'r', encoding='utf-8') as f: db = json.load(f)
@@ -42,7 +63,7 @@ class BaseDataProcessor(ABC):
                 if not x: return ""
                 return "|".join(str(x.get(key, '')) for key in keys)
 
-            seen = {make_key(x, key_list) for x in existing_data}
+            seen = set(make_key(item, key_list) for item in existing_data)
             merged_data = list(existing_data)
             if processed_data:
                 for item in processed_data:
@@ -51,37 +72,32 @@ class BaseDataProcessor(ABC):
                     if k not in seen:
                         merged_data.append(item)
                         seen.add(k)
+            # Check if we should preserve original search ranges (for refresh operations)
+            if 'original_search_first_date' in config:
+                self._preserve_original_ranges = True
+                self._original_first_date = config['original_search_first_date']
+                self._original_last_date = config['original_search_last_date']
+            else:
+                self._preserve_original_ranges = False
+            
             # We should call _update_date_ranges when there were no datas, too.
-            self._update_date_ranges(db, company_name, existing_entry, fd_new, ld_new, merged_data)
+            self._update_date_ranges(db, company_name, existing_entry, fd_new, ld_new, merged_data, db_filename)
             return True
         except Exception as e: raise Exception(f"❌ JSON saving failed: {e}")
     
-    def _update_date_ranges(self, db, company_name, existing_entry, fd_new, ld_new, merged_data):
-        def _ranges_overlap(fd1, ld1, fd2, ld2):
-            if not all([fd1, ld1, fd2, ld2]): return False
-            return fd1 <= ld2 and fd2 <= ld1
-        
-        def _safe_min(a, b):
-            if a is None: return b
-            if b is None: return a
-            return min(a, b)
-        
-        def _safe_max(a, b):
-            if a is None: return b
-            if b is None: return a
-            return max(a, b)
-   
-        fd_old = existing_entry.get('first_date')
-        ld_old = existing_entry.get('last_date')
-        if fd_old is None or ld_old is None:
-            fd_fin, ld_fin = fd_new, ld_new
-        elif _ranges_overlap(fd_old, ld_old, fd_new, ld_new):
-            fd_fin, ld_fin = _safe_min(fd_old, fd_new), _safe_max(ld_old, ld_new)
+    def _update_date_ranges(self, db, company_name, existing_entry, fd_new, ld_new, merged_data, db_filename):
+        # Use the search date ranges as first_date and last_date (not actual data dates)
+        # For refresh operations, preserve original search ranges if provided
+        if hasattr(self, '_preserve_original_ranges') and self._preserve_original_ranges:
+            fd_fin = getattr(self, '_original_first_date', fd_new)
+            ld_fin = getattr(self, '_original_last_date', ld_new)
+        else:
+            fd_fin = fd_new  # Search from_date
+            ld_fin = ld_new  # Search to_date
         
         modules_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(modules_dir)
-        db_filename = self.get_database_filename()
-        db_path = os.path.join(root_dir, db_filename)
+        db_path = os.path.join(root_dir, 'resources', db_filename)
         
         db[company_name] = {
             'first_date': fd_fin,
@@ -92,7 +108,6 @@ class BaseDataProcessor(ABC):
 
 class HistDataProcessor(BaseDataProcessor):
     def __init__(self): super().__init__('hist')
-    def get_database_filename(self): return get('saved_json_hist')
     def process_raw_data(self, items):
         processed_data = []
         for item in items:
@@ -117,50 +132,218 @@ class HistDataProcessor(BaseDataProcessor):
 
 class PrcDataProcessor(BaseDataProcessor):
     def __init__(self): super().__init__('prc')
-    def get_database_filename(self): return get('saved_json_prc')
     def process_raw_data(self, items):
         processed_data = []
-        processed_data = items
+        for item in items:
+            try:
+                if not item: continue
+                company_name = item.get('company', '')
+                date = item.get('date', '')
+                table_data = item.get('table_data', [])
+                report_data = table_data[0]['rows']
+                
+                if len(report_data[1].get('data', [])) >= 4:
+                    row_data = report_data[1]['data']
+                    print("row_data", row_data)
+                    round_val = str(row_data[0]).strip()
+                    prev_prc = str(row_data[2]).strip()
+                    issue_price = str(row_data[3]).strip()
+                    print("round_val", round_val, "prev_prc", prev_prc, "issue_price", issue_price)
+                    processed_data.append({
+                        'company': company_name,
+                        'date': date,
+                        'round': round_val,
+                        'prev_prc': prev_prc,
+                        'issue_price': issue_price
+                    })
+            except Exception as e: continue
         return processed_data
 
 class SearchMode:    
     def __init__(self, config):
-        self.name                 = config.get('name')
-        self.display_name         = config.get('display_name')
-        self.keyword              = config.get('keyword')
-        self.keywords_list        = config.get('keywords_list')
-        self.main_menu_selector   = config.get('main_menu_selector')
-        self.sub_menu_selector    = config.get('sub_menu_selector')
-        self.data_processor_class = config.get('data_processor_class')
-        self.database_file        = config.get('database_file')
-        self.description          = config.get('description')
-        self.columns              = config.get('columns')
+        # Display configs
+        self.id = config.get('id') # id for the mode. 'hist'
+        self.title = config.get('title') # title for display. '전환기록 조회'
+
+        # Scraping configs
+        self.keyword = config.get('keyword') # 검색할 키워드. 
+        self.keywords_list = config.get('keywords_list') # 제목에 들어가는지 검사할 키워드 리스트.
+        self.main_menu_selector = config.get('main_menu_selector') # 메인 메뉴 선택자. '시장조치'
+        self.sub_menu_selector = config.get('sub_menu_selector') # 서브 메뉴 선택자. '신규발행'
+        self.data_processor_class = config.get('data_processor_class') # 데이터 처리 클래스. HistDataProcessor
+        self.database_name = config.get('database_name') # 데이터베이스 파일 이름. 'database_hist.json'
+        self.columns = config.get('columns') # 데이터베이스 구조. ['company', 'date', ... ]
+        
+        # Page generation configs
+        self.execution_message    = config.get('execution_message')
+        self.run_function         = config.get('run_function')
+    
+    def generate_page(self):
+        config = {
+            "title": self.title,
+            "database_address": f"resources/{self.database_name}",
+            "execution_message": self.execution_message,
+            "run_function": self.run_function,  
+        }
+        return execution_setup_page(config)
+    
+    def generate_dataset_page(self, company_name=None, round_filter=''):
+        """Generate dataset page using real data from database files"""
+        page = BasicPage(title=f"{self.title}", container_width="1200px", container_height="800px")
+        
+        # Load real data from database file
+        try:
+            # Get database file path
+            modules_dir = os.path.dirname(os.path.abspath(__file__))
+            root_dir = os.path.dirname(modules_dir)
+            db_filename = self.database_name
+            db_path = os.path.join(root_dir, 'resources', db_filename)
+            
+            # Load database
+            with open(db_path, 'r', encoding='utf-8') as f:
+                database = json.load(f)
+            
+            # Get company data
+            if company_name and company_name in database:
+                company_data = database[company_name]
+                first_date = company_data.get('first_date', '')
+                last_date = company_data.get('last_date', '')
+                rows_data = company_data.get('data', [])
+                display_company = company_name
+            else:
+                # If no specific company, show all companies data
+                all_data = []
+                companies = list(database.keys())
+                display_company = f"전체 기업 ({len(companies)}개)" if companies else "데이터 없음"
+                first_date = ""
+                last_date = ""
+                
+                for comp_name, comp_data in database.items():
+                    comp_rows = comp_data.get('data', [])
+                    for row in comp_rows:
+                        row_copy = row.copy()
+                        row_copy['company'] = comp_name  # Ensure company name is set
+                        all_data.append(row_copy)
+                
+                # Sort by date (most recent first)
+                all_data.sort(key=lambda x: x.get('date', ''), reverse=True)
+                rows_data = all_data[:100]  # Limit to 100 most recent entries
+                
+                if all_data:
+                    first_date = all_data[-1].get('date', '')
+                    last_date = all_data[0].get('date', '')
+            
+            # Apply round filter if specified
+            if round_filter and round_filter.strip():
+                rows_data = [row for row in rows_data if str(row.get('round', '')).strip() == round_filter.strip()]
+            
+            # Sort data in ascending order (oldest first) for proper cumulative calculation
+            rows_data.sort(key=lambda x: x.get('date', ''))
+            
+            # Set column titles based on mode - matching the actual table structure
+            if self.id == 'hist':
+                # Calculate cumulative values for HIST mode
+                acc_shares = 0
+                acc_amount = 0
+                for row in rows_data:
+                    shares = self._parse_number(row.get('additional_shares', ''))
+                    price = self._parse_number(row.get('issue_price', ''))
+                    amount = shares * price
+                    acc_shares += shares
+                    acc_amount += amount
+                    # Add cumulative values to each row
+                    row['cumulative_shares'] = acc_shares
+                    row['cumulative_amount'] = acc_amount
+                column_titles = ["#", "발행시간", "회차", "추가주식수(주)", "누적 추가주식수", "발행가액(원)", "총액", "누적 총액"]
+            elif self.id == 'prc':
+                # PRC mode doesn't need cumulative calculations
+                acc_shares = 0
+                acc_amount = 0
+                column_titles = ["#", "날짜", "회차", "이전 전환가", "현재 전환가"]
+            else:
+                # Default to HIST mode structure
+                acc_shares = 0
+                acc_amount = 0
+                column_titles = ["#", "발행시간", "회차", "추가주식수(주)", "누적 추가주식수", "발행가액(원)", "총액", "누적 총액"]
+            
+        except Exception as e:
+            # Fallback to empty data if database loading fails
+            print(f"Warning: Could not load database for {self.id}: {e}")
+            rows_data = []
+            display_company = "데이터 로드 실패"
+            first_date = ""
+            last_date = ""
+            acc_shares = 0
+            acc_amount = 0
+            column_titles = ["#", "발행시간", "회차", "추가주식수(주)", "누적 추가주식수", "발행가액(원)", "총액", "누적 총액"]
+        
+        return page.element_dataset_table_page(
+            company_name=display_company,
+            mode=self.id,
+            mode_name=self.title,
+            round_filter=round_filter,
+            rows_data=rows_data,
+            first_date=first_date,
+            last_date=last_date,
+            acc_shares=acc_shares,
+            acc_amount=acc_amount,
+            column_titles=column_titles
+        )
+    
+    def _parse_number(self, text):
+        """Parse number from text, handling commas and Korean number formats"""
+        if not text:
+            return 0
+        try:
+            # Remove commas and convert to int
+            return int(text.replace(',', ''))
+        except (ValueError, AttributeError):
+            return 0
 
 SEARCH_MODES = {
     'hist': SearchMode({
-        'name': 'hist',
-        'display_name': '전환기록 조회',
+        # Display configs
+        'id': 'hist',
+        'title': '추가상장 기록 조회',
+        
+        # Scraping configs
         'keyword': None,
-        'keywords_list': ['CB', 'EB', 'BW'],
+        'keywords_list': ['CB', 'EB', 'BW', '전환', '추가상장'],
         'main_menu_selector': '#dsclsType02',
         'sub_menu_selector': '#dsclsLayer02_25',
         'data_processor_class': HistDataProcessor,
-        'database_file': get('saved_json_hist'),
-        'description': '전환기록 조회',
+        'database_name': 'database_hist.json',
         'columns': ['company', 'date', 'round', 'additional_shares', 'issue_price'],
+        
+        # Page generation configs
+        'execution_message': '추가상장 기록 조회를 실행합니다.\\n대상: ${searchTarget}',
+        'run_function': 'run_hist_scraper'
     }),
     'prc': SearchMode({
-        'name': 'prc',
-        'display_name': '전환가액 변동기록 조회',
+        # Display configs
+        'id': 'prc',
+        'title': '전환가액 변동 조회',
+        
+        # Scraping configs
         'keyword': '조정',
         'keywords_list': None,
         'main_menu_selector': '#dsclsType04',
         'sub_menu_selector': '#dsclsLayer04_17',
         'data_processor_class': PrcDataProcessor,
-        'database_file': get('saved_json_prc'),
-        'description': '전환가액 변동기록 조회',
-        'columns': ['full_data'],
+        'database_name': 'database_prc.json',
+        'columns': ['company', 'date', 'round', 'prev_prc', 'issue_price'],
+        # ["#", "날짜", "회차", "이전 전환가", "현재 전환가"]
+        # Page generation configs
+        'execution_message': '전환가액 변동 조회를 실행합니다.\\n대상: ${searchTarget}',
+        'run_function': 'run_prc_scraper'
     })
 }
+
 def get_all_modes(): return SEARCH_MODES
 def get_search_mode(mode_name): return SEARCH_MODES.get(mode_name)
+
+def hist_page(): return SEARCH_MODES['hist'].generate_page()
+def prc_page(): return SEARCH_MODES['prc'].generate_page()
+
+def hist_dataset_page(company_name=None, round_filter=''): return SEARCH_MODES['hist'].generate_dataset_page(company_name, round_filter)
+def prc_dataset_page(company_name=None, round_filter=''): return SEARCH_MODES['prc'].generate_dataset_page(company_name, round_filter)

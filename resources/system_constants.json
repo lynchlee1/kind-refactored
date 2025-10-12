@@ -1,0 +1,43 @@
+{
+  "defaults": {
+    "company_name": "",
+    "from_date": "2025-09-01",
+    "to_date": ""
+  },
+  "files": {
+    "results_json": "results.json",
+    "saved_json_hist": "resources/database_hist.json",
+    "saved_json_prc": "resources/database_prc.json"
+  },
+  "selectors": {
+    "company_input_selector": "#AKCKwd",
+    "from_date_selector": "input[name='fromDate']",
+    "to_date_selector": "input[name='toDate']",
+    "keyword_input_selector": "#reportNmTemp",
+    "reset_selector": "#bfrDsclsType",
+    "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc",
+    "iframe_selector": "iframe[name='docViewFrm']",
+    "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
+    "result_row_selector": "table.list.type-00",
+    "search_button_selector": "#searchForm > section.search-group.type-00 > div > div.btn-group.type-bt > a.btn-sprite.type-00.vmiddle.search-btn",
+    "table_selector": "table, iframe"
+  },
+  "timing": {
+    "buffer_time": 0.4,
+    "long_loadtime": 3,
+    "short_loadtime": 1.5,
+    "waitcount": 7,
+    "timeout": 1
+  },
+  "urls": {
+    "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
+  },
+  "others": {},
+  "holdings": {
+    "holdings": [
+      "녹십자엠에스",
+      "한울소재과학",
+      "에스티팜"
+    ]
+  }
+}

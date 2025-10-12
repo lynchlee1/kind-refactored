@@ -1,7 +1,7 @@
 {
   "에스티팜": {
-    "first_date": "2024-09-01",
-    "last_date": "2025-10-09",
+    "first_date": "2024-01-01",
+    "last_date": "2024-12-31",
     "data": [
       {
         "company": "에스티팜",
@@ -68,6 +68,13 @@
       },
       {
         "company": "에스티팜",
+        "date": "2024-09-12 17:20",
+        "round": "2",
+        "additional_shares": "21,971",
+        "issue_price": "79,648"
+      },
+      {
+        "company": "에스티팜",
         "date": "2024-09-09 16:50",
         "round": "2",
         "additional_shares": "119,272",
@@ -78,6 +85,13 @@
         "date": "2024-09-04 17:22",
         "round": "2",
         "additional_shares": "17,577",
+        "issue_price": "79,648"
+      },
+      {
+        "company": "에스티팜",
+        "date": "2024-09-04 17:22",
+        "round": "2",
+        "additional_shares": "47,709",
         "issue_price": "79,648"
       },
       {
@@ -96,78 +110,78 @@
       },
       {
         "company": "에스티팜",
-        "date": "2024-09-12 17:20",
+        "date": "2024-08-29 16:38",
         "round": "2",
-        "additional_shares": "21,971",
+        "additional_shares": "4,394",
         "issue_price": "79,648"
       },
       {
         "company": "에스티팜",
-        "date": "2024-09-04 17:22",
+        "date": "2024-08-28 16:47",
         "round": "2",
-        "additional_shares": "47,709",
+        "additional_shares": "43,943",
         "issue_price": "79,648"
       },
       {
         "company": "에스티팜",
-        "date": "2025-09-23 17:00",
-        "round": "",
-        "additional_shares": "1",
-        "issue_price": "2"
+        "date": "2024-07-22 17:02",
+        "round": "1",
+        "additional_shares": "218,248",
+        "issue_price": "68,729"
       },
       {
         "company": "에스티팜",
-        "date": "2025-09-23 17:00",
-        "round": "7",
-        "additional_shares": "8",
-        "issue_price": "9"
+        "date": "2024-06-14 16:32",
+        "round": "1",
+        "additional_shares": "145,498",
+        "issue_price": "68,729"
       },
       {
         "company": "에스티팜",
-        "date": "2025-09-23 17:00",
-        "round": "14",
-        "additional_shares": "15",
-        "issue_price": "16"
+        "date": "2024-05-24 17:07",
+        "round": "1",
+        "additional_shares": "181,873",
+        "issue_price": "68,729"
       },
       {
         "company": "에스티팜",
-        "date": "2025-09-23 17:00",
-        "round": "21",
-        "additional_shares": "22",
-        "issue_price": "23"
+        "date": "2024-05-17 16:41",
+        "round": "1",
+        "additional_shares": "202,243",
+        "issue_price": "68,729"
       },
       {
         "company": "에스티팜",
-        "date": "2025-09-23 17:00",
-        "round": "28",
-        "additional_shares": "29",
-        "issue_price": "30"
+        "date": "2024-04-02 17:22",
+        "round": "1",
+        "additional_shares": "125,129",
+        "issue_price": "68,729"
       }
     ]
   },
   "한울소재과학": {
-    "first_date": "2024-10-07",
-    "last_date": "2025-10-09",
+    "first_date": "2024-01-01",
+    "last_date": "2024-12-31",
     "data": [
       {
         "company": "한울소재과학",
-        "date": "2025-10-02 17:05",
-        "round": "4",
-        "additional_shares": "217,013",
-        "issue_price": "2,304"
-      },
-      {
-        "company": "한울소재과학",
-        "date": "2025-10-02 17:05",
-        "round": "5",
-        "additional_shares": "217,013",
-        "issue_price": "2,304"
+        "date": "2024-02-14 18:09",
+        "round": "3",
+        "additional_shares": "100,000",
+        "issue_price": "2,807"
       },
       {
         "company": "한울소재과학",
         "date": "2025-07-09 16:45",
         "round": "5",
         "additional_shares": "173,611",
+        "issue_price": "2,304"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2025-07-09 16:45",
+        "round": "5",
+        "additional_shares": "108,506",
         "issue_price": "2,304"
       },
       {
@@ -274,6 +288,68 @@
         "round": "3",
         "additional_shares": "57,502",
         "issue_price": "10,869"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2025-10-02 17:05",
+        "round": "4",
+        "additional_shares": "217,013",
+        "issue_price": "2,304"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2025-10-02 17:05",
+        "round": "5",
+        "additional_shares": "217,013",
+        "issue_price": "2,304"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2024-01-15 17:08",
+        "round": "제3자배정",
+        "additional_shares": "3,920,544",
+        "issue_price": "1,913"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2025-01-15 18:00",
+        "round": "제3자배정",
+        "additional_shares": "3,457,600",
+        "issue_price": "3,702"
+      },
+      {
+        "company": "한울소재과학",
+        "date": "2025-01-13 16:55",
+        "round": "제3자배정",
+        "additional_shares": "243,427",
+        "issue_price": "4,108"
+      }
+    ]
+  },
+  "녹십자엠에스": {
+    "first_date": "2024-01-01",
+    "last_date": "2024-12-31",
+    "data": [
+      {
+        "company": "녹십자엠에스",
+        "date": "2024-08-28 17:00",
+        "round": "4",
+        "additional_shares": "113,571",
+        "issue_price": "5,283"
+      },
+      {
+        "company": "녹십자엠에스",
+        "date": "2024-08-28 17:00",
+        "round": "4",
+        "additional_shares": "492,144",
+        "issue_price": "5,283"
+      },
+      {
+        "company": "녹십자엠에스",
+        "date": "2024-01-17 17:25",
+        "round": "4",
+        "additional_shares": "18,928",
+        "issue_price": "5,283"
       }
     ]
   }

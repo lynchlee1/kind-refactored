@@ -49,3 +49,6 @@ geckodriver
 
 # Generated files
 details_links.json
+html_pages/*.html
+*.html
+!logo.jpg

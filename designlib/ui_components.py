@@ -9,15 +9,23 @@ class BasicPage:
         self.elements = []
         self.scripts = []
     
-    def element_header(self, logo_url="../logo.jpg", logo_width="320px", logo_height="100px", 
-                      title="KIND 행사내역 조회 프로그램", subtitle="타임폴리오 대체투자본부"):
-        return f'''
-        <div class="header">
+    def element_header(self, logo_url="/logo.jpg", logo_width="320px", logo_height="100px", 
+                      title="KIND 행사내역 조회 프로그램", subtitle="타임폴리오 대체투자본부", show_logo=False, show_subtitle=False):
+        logo_html = ""
+        if show_logo:
+            logo_html = f'''
             <div class="logo">
                 <img src="{logo_url}" alt="Logo" style="width:{logo_width};height:{logo_height};object-fit:contain;border-radius:10px;">
             </div>
+            '''
+        subtitle_html = ""
+        if show_subtitle:
+            subtitle_html = f'<p class="subtitle">{subtitle}</p>'
+        return f'''
+        <div class="header">
+            {logo_html}
             <h1 class="title">{title}</h1>
-            <p class="subtitle">{subtitle}</p>
+            {subtitle_html}
         </div>
         '''
     
@@ -35,7 +43,7 @@ class BasicPage:
     
     def element_date(self, from_date_label="검색 시작일", to_date_label="검색 종료일", 
                     from_date_id="fromDate", to_date_id="toDate", 
-                    from_date_value="2024-09-20", to_date_value="2025-09-30"):
+                    from_date_value="2024-01-01", to_date_value="2025-01-01"):
         return f'''
         <div class="form-group">
             <div class="date-row">
@@ -53,20 +61,62 @@ class BasicPage:
         </div>
         '''
     
+    # All-customizable checkbox element
     def element_checkbox(self, checkbox_id="headless", checkbox_name="headless", 
-                        label_text="Chrome 팝업 없이 실행하기", checked=False):
+                        label_text="", checked=False, as_button=False, button_class="btn-checkbox-toggle",
+                        width=None, height=None, position=None, top=None, right=None, 
+                        bottom=None, left=None, z_index=None):
+
         checked_attr = "checked" if checked else ""
-        return f'''
-        <div class="checkbox-group">
-            <input type="checkbox" id="{checkbox_id}" name="{checkbox_name}" class="checkbox" {checked_attr}>
-            <label for="{checkbox_id}" class="checkbox-label">{label_text}</label>
-        </div>
-        '''
+        position_styles = []
+        if position: position_styles.append(f"position:{position}")
+        if width: position_styles.append(f"width:{width}")
+        if height: position_styles.append(f"height:{height}")
+        if top is not None: position_styles.append(f"top:{top}")
+        if right is not None: position_styles.append(f"right:{right}")
+        if bottom is not None: position_styles.append(f"bottom:{bottom}")
+        if left is not None: position_styles.append(f"left:{left}")
+        if z_index is not None: position_styles.append(f"z-index:{z_index}")        
+        combined_style = ";".join(position_styles)
+        style_attr = f'style="{combined_style}"' if combined_style else ""
+        
+        if as_button:
+            return f'''
+            <div class="{button_class}" {style_attr}>
+                <input type="checkbox" id="{checkbox_id}" name="{checkbox_name}" class="checkbox" {checked_attr}>
+                <label for="{checkbox_id}" class="checkbox-label">{label_text}</label>
+            </div>
+            '''
+        else:
+            return f'''
+            <div class="checkbox-group" {style_attr}>
+                <input type="checkbox" id="{checkbox_id}" name="{checkbox_name}" class="checkbox" {checked_attr}>
+                <label for="{checkbox_id}" class="checkbox-label">{label_text}</label>
+            </div>
+            '''
     
+    # All-customizable button element
     def element_button(self, button_id, button_text, button_type="button", 
-                      button_class="btn btn-primary", onclick="", style="", hidden=False):
+                      button_class="btn btn-primary", onclick="", style="", hidden=False,
+                      width=None, height=None, position=None, top=None, right=None, 
+                      bottom=None, left=None, z_index=None):
         hidden_style = "display:none" if hidden else ""
-        combined_style = f"{hidden_style};{style}" if style else hidden_style
+        
+        position_styles = []
+        if position: position_styles.append(f"position:{position}")
+        if width: position_styles.append(f"width:{width}")
+        if height: position_styles.append(f"height:{height}")
+        if top is not None: position_styles.append(f"top:{top}")
+        if right is not None: position_styles.append(f"right:{right}")
+        if bottom is not None: position_styles.append(f"bottom:{bottom}")
+        if left is not None: position_styles.append(f"left:{left}")
+        if z_index is not None: position_styles.append(f"z-index:{z_index}")
+        
+        all_styles = [hidden_style]
+        if style: all_styles.append(style)
+        if position_styles: all_styles.extend(position_styles)
+        
+        combined_style = ";".join([s for s in all_styles if s])
         style_attr = f'style="{combined_style}"' if combined_style else ""
         onclick_attr = f'onclick="{onclick}"' if onclick else ""
         return f'''
@@ -74,6 +124,7 @@ class BasicPage:
                 {onclick_attr} {style_attr}>{button_text}</button>
         '''
     
+    # Button group element
     def element_button_group(self, buttons):
         button_html = ""
         for button in buttons:
@@ -84,16 +135,200 @@ class BasicPage:
         </div>
         '''
     
+    # Information panel. Not recommended to use. Remaining for backward compatibility.
     def element_info_panel(self, panel_id="companyInfo", hidden=True):
         display_style = "display: none;" if hidden else ""
         return f'''
         <div id="{panel_id}" class="info-panel" style="{display_style}"></div>
         '''
     
+    # Generate dataset table page
+    def element_dataset_table_page(self, company_name="", mode="hist", mode_name = "", round_filter="", 
+                                   rows_data=None, first_date="-", last_date="-", 
+                                   acc_shares=0, acc_amount=0, column_titles=None):
+        table_rows = ""
+        if rows_data is None: rows_data = []
+        if rows_data:
+            for idx, row in enumerate(rows_data, start=1):
+                if mode == 'prc':
+                    # PRC mode: show conversion price data
+                    table_rows += f"""
+                    <tr>
+                        <td>{idx}</td>
+                        <td>{row.get('date', '')}</td>
+                        <td>{row.get('round', '')}</td>
+                        <td style='text-align:right'>{row.get('prev_prc', '')}</td>
+                        <td style='text-align:right'>{row.get('issue_price', '')}</td>
+                    </tr>
+                    """
+                else:
+                    # HIST mode: show share issuance data with cumulative values
+                    shares = self._to_int(row.get('additional_shares', ''))
+                    price = self._to_int(row.get('issue_price', ''))
+                    amount = shares * price
+                    # Use cumulative values calculated in each row
+                    cumulative_shares = row.get('cumulative_shares', 0)
+                    cumulative_amount = row.get('cumulative_amount', 0)
+                    table_rows += f"""
+                    <tr>
+                        <td>{idx}</td>
+                        <td>{row.get('date', '')}</td>
+                        <td>{row.get('round', '')}</td>
+                        <td style='text-align:right'>{row.get('additional_shares', '')}</td>
+                        <td style='text-align:right'>{cumulative_shares:,}</td>
+                        <td style='text-align:right'>{row.get('issue_price', '')}</td>
+                        <td style='text-align:right'>{amount:,}</td>
+                        <td style='text-align:right'>{cumulative_amount:,}</td>
+                    </tr>
+                    """
+        else: table_rows = f'<tr><td colspan="{len(column_titles) if column_titles else 5}" style="text-align:center;color:#888">데이터가 없습니다</td></tr>'        
+        # Generate summary text based on mode
+        if mode == 'prc':
+            summary_text = f"총 {len(rows_data)} 건 ({first_date} ~ {last_date})"
+        else:
+            summary_text = f"총 {len(rows_data)} 건 ({first_date} ~ {last_date}) · 누적 추가주식수: {acc_shares:,} · 누적 총액: {acc_amount:,}"
+        
+        # Generate CSS based on mode
+        extra_css = '''
+        td:nth-child(6), td:nth-child(7), td:nth-child(8),
+        th:nth-child(6), th:nth-child(7), th:nth-child(8) {
+            text-align: right;
+        }''' if mode != 'prc' else ''
+        
+        return f'''
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{mode_name} - {company_name}</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', 'Malgun Gothic', Arial, sans-serif;
+            padding: 20px;
+            background: #f5f7fb;
+        }}
+        h2 {{
+            margin-bottom: 16px;
+            color: #2c3e50;
+        }}
+        .meta {{
+            margin-bottom: 12px;
+            color: #555;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+        }}
+        th, td {{
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }}
+        th {{
+            background: #f0f4ff;
+            color: #2c3e50;
+        }}
+        tr:hover {{
+            background: #fafcff;
+        }}
+        .topbar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 12px;
+        }}
+        .btn {{
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+        }}
+        .btn:active {{
+            opacity: .9;
+        }}
+        .filter {{
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }}
+        .input {{
+            height: 36px;
+            padding: 0 10px;
+            border: 1px solid #d8e1ff;
+            border-radius: 8px;
+        }}
+        td:nth-child(1), th:nth-child(1) {{
+            text-align: center;
+            width: 60px;
+        }}
+        td:nth-child(3), th:nth-child(3) {{
+            text-align: center;
+            width: 80px;
+        }}
+        td:nth-child(4), td:nth-child(5), th:nth-child(4), th:nth-child(5) {{
+            text-align: right;
+        }}{extra_css}
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h2>기록 보기 - {company_name}</h2>
+        <div class="filter">
+            <input id="roundInput" class="input" type="text" placeholder="회차 입력 (엔터로 검색)" value="{round_filter}">
+            <button class="btn" onclick="applyFilter()">입력</button>
+            <button class="btn" onclick="history.back()">뒤로</button>
+        </div>
+    </div>
+    <div class="meta">
+        {summary_text}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                {''.join([f'<th>{title}</th>' for title in column_titles])}
+            </tr>
+        </thead>
+        <tbody>{table_rows}</tbody>
+    </table>
+    <script>
+        function applyFilter() {{
+            const v = document.getElementById('roundInput').value.trim();
+            const url = new URL(window.location.href);
+            if (v) {{
+                url.searchParams.set('round', v);
+            }} else {{
+                url.searchParams.delete('round');
+            }}
+            window.location.href = url.toString();
+        }}
+        document.getElementById('roundInput').addEventListener('keydown', function(e) {{
+            if (e.key === 'Enter') {{
+                applyFilter();
+            }}
+        }});
+    </script>
+</body>
+</html>
+        '''
+    
+    def _to_int(self, value):
+        """Helper method to convert string to int, handling commas"""
+        try:
+            return int(str(value).replace(',', '').strip())
+        except:
+            return 0
+    
     def add_element(self, element_html):
         self.elements.append(element_html)
-    
-    def add_script(self, script_content):
+
+    def add_script(self, script_content): 
         self.scripts.append(script_content)
     
     def generate_html(self, form_id="configForm"):
@@ -142,6 +377,7 @@ class BasicPage:
             width: 100%;
             max-width: {self.container_width};
             min-height: {self.container_height};
+            position: relative;
             animation: slideUp 0.5s ease-out;
         }}
         
@@ -241,11 +477,12 @@ class BasicPage:
         .button-group {{
             display: flex;
             gap: 15px;
-            justify-content: flex-end;
+            justify-content: center;
+            width: 100%;
         }}
         
         .btn {{
-            padding: 15px 30px;
+            padding: 12px 28px;
             border: none;
             border-radius: 12px;
             font-size: 16px;
@@ -253,6 +490,10 @@ class BasicPage:
             cursor: pointer;
             transition: all 0.3s ease;
             min-width: 120px;
+        }}
+
+        .btn-long {{
+            min-width: 420px;
         }}
         
         .btn-primary {{
@@ -334,6 +575,81 @@ class BasicPage:
             border: 1px solid #e9ecef;
             border-radius: 6px;
             font-size: 12px;
+        }}
+        
+        .loading-spinner {{
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }}
+        
+        .spinner {{
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }}
+        
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        
+        /* Styles for checkbox as button */
+        .btn-checkbox-toggle {{
+            display: inline-block;
+        }}
+        .btn-checkbox-toggle input[type="checkbox"] {{
+            display: none;
+        }}
+        .btn-checkbox-toggle label {{
+            display: inline-block;
+            padding: 4px 12px;
+            margin-bottom: 0;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            cursor: pointer;
+            border: 1px solid #6c757d;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            color: #6c757d;
+            background-color: transparent;
+            min-width: 100px;
+            height: 28px;
+        }}
+        .btn-checkbox-toggle input[type="checkbox"]:checked + label {{
+            color: #fff;
+            background-color: #6c757d;
+            border-color: #6c757d;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(108,117,125,0.3);
+        }}
+        .btn-checkbox-toggle label:hover {{
+            color: #fff;
+            background-color: #5a6268;
+            border-color: #5a6268;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(90,98,104,0.3);
+        }}
+        
+        /* Additional positioning utilities */
+        .btn-fixed {{
+            position: fixed !important;
+        }}
+        
+        .btn-absolute {{
+            position: absolute !important;
+        }}
+        
+        .btn-relative {{
+            position: relative !important;
         }}
     </style>
 </head>
