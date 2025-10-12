@@ -353,11 +353,6 @@
       }
     ]
   },
-  "미래나노텍": {
-    "first_date": "2023-01-01",
-    "last_date": "2025-10-12",
-    "data": []
-  },
   "켄코아에어로스페이스": {
     "first_date": "2023-01-01",
     "last_date": "2025-10-12",
@@ -461,16 +456,6 @@
         "issue_price": "12,296"
       }
     ]
-  },
-  "자화전자": {
-    "first_date": "2023-01-01",
-    "last_date": "2025-10-12",
-    "data": []
-  },
-  "상아프론테크": {
-    "first_date": "2023-01-01",
-    "last_date": "2025-10-12",
-    "data": []
   },
   "선익시스템": {
     "first_date": "2023-01-01",
@@ -583,19 +568,380 @@
       }
     ]
   },
-  "베뉴지": {
+  "드림씨아이에스": {
     "first_date": "2023-01-01",
     "last_date": "2025-10-12",
-    "data": []
+    "data": [
+      {
+        "company": "드림씨아이에스",
+        "date": "2024-06-03 17:00",
+        "round": "-",
+        "additional_shares": "90,044",
+        "issue_price": "2,670"
+      },
+      {
+        "company": "드림씨아이에스",
+        "date": "2023-10-25 18:13",
+        "round": "-",
+        "additional_shares": "17,781,960",
+        "issue_price": "500"
+      },
+      {
+        "company": "드림씨아이에스",
+        "date": "2023-05-31 16:18",
+        "round": "-",
+        "additional_shares": "1,600",
+        "issue_price": "5,000"
+      }
+    ]
   },
-  "덕우전자": {
+  "SKAI": {
     "first_date": "2023-01-01",
     "last_date": "2025-10-12",
-    "data": []
+    "data": [
+      {
+        "company": "SKAI",
+        "date": "2025-07-16 17:04",
+        "round": "2",
+        "additional_shares": "187,869",
+        "issue_price": "4,872"
+      },
+      {
+        "company": "SKAI",
+        "date": "2025-04-23 17:02",
+        "round": "2",
+        "additional_shares": "93,934",
+        "issue_price": "4,872"
+      },
+      {
+        "company": "SKAI",
+        "date": "2025-03-21 16:45",
+        "round": "2",
+        "additional_shares": "31,311",
+        "issue_price": "4,872"
+      },
+      {
+        "company": "SKAI",
+        "date": "2024-12-13 17:39",
+        "round": "제3자배정",
+        "additional_shares": "3,901,170",
+        "issue_price": "1,538"
+      },
+      {
+        "company": "SKAI",
+        "date": "2024-11-27 17:15",
+        "round": "-",
+        "additional_shares": "8,577,582",
+        "issue_price": "500"
+      },
+      {
+        "company": "SKAI",
+        "date": "2024-11-12 16:59",
+        "round": "주주배정 후 실권주 일반공모",
+        "additional_shares": "11,000,000",
+        "issue_price": "1,490"
+      },
+      {
+        "company": "SKAI",
+        "date": "2023-05-23 17:16",
+        "round": "-",
+        "additional_shares": "15,000",
+        "issue_price": "3,333"
+      },
+      {
+        "company": "SKAI",
+        "date": "2023-02-03 16:21",
+        "round": "-",
+        "additional_shares": "75,000",
+        "issue_price": "3,333"
+      }
+    ]
   },
-  "나노신소재": {
+  "삼기에너지솔루션즈": {
     "first_date": "2023-01-01",
     "last_date": "2025-10-12",
-    "data": []
+    "data": [
+      {
+        "company": "삼기에너지솔루션즈",
+        "date": "2023-09-19 16:28",
+        "round": "-",
+        "additional_shares": "42,897,180",
+        "issue_price": "100"
+      }
+    ]
+  },
+  "성일하이텍": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "성일하이텍",
+        "date": "2025-09-02 17:14",
+        "round": "-",
+        "additional_shares": "27,537",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2025-09-02 17:14",
+        "round": "-",
+        "additional_shares": "1,000",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2025-06-24 17:07",
+        "round": "-",
+        "additional_shares": "18,340",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2025-04-01 18:06",
+        "round": "-",
+        "additional_shares": "27,475",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2025-04-01 18:06",
+        "round": "-",
+        "additional_shares": "1,000",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-11-29 15:51",
+        "round": "-",
+        "additional_shares": "9,653",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-11-29 15:51",
+        "round": "-",
+        "additional_shares": "1,000",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-08-22 16:46",
+        "round": "-",
+        "additional_shares": "1,150",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-08-22 16:46",
+        "round": "-",
+        "additional_shares": "1,100",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-05-21 16:14",
+        "round": "-",
+        "additional_shares": "25,707",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-05-21 16:14",
+        "round": "-",
+        "additional_shares": "4,500",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-02-20 18:18",
+        "round": "-",
+        "additional_shares": "58,464",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2024-02-20 18:18",
+        "round": "-",
+        "additional_shares": "4,000",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-11-28 17:19",
+        "round": "-",
+        "additional_shares": "25,826",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-11-28 17:19",
+        "round": "-",
+        "additional_shares": "400",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-08-29 17:31",
+        "round": "-",
+        "additional_shares": "10,528",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-08-29 17:31",
+        "round": "-",
+        "additional_shares": "2,500",
+        "issue_price": "25,182"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-06-20 17:21",
+        "round": "-",
+        "additional_shares": "16,726",
+        "issue_price": "18,887"
+      },
+      {
+        "company": "성일하이텍",
+        "date": "2023-03-21 17:56",
+        "round": "-",
+        "additional_shares": "56,587",
+        "issue_price": "18,887"
+      }
+    ]
+  },
+  "에스엠씨지": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "에스엠씨지",
+        "date": "2025-08-28 15:58",
+        "round": "-",
+        "additional_shares": "520,000",
+        "issue_price": "1,000"
+      },
+      {
+        "company": "에스엠씨지",
+        "date": "2025-06-26 15:39",
+        "round": "1",
+        "additional_shares": "899,999",
+        "issue_price": "1,550"
+      }
+    ]
+  },
+  "에스오에스랩": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "에스오에스랩",
+        "date": "2024-10-22 17:05",
+        "round": "-",
+        "additional_shares": "151,190",
+        "issue_price": "2,394"
+      },
+      {
+        "company": "에스오에스랩",
+        "date": "2024-10-22 17:05",
+        "round": "-",
+        "additional_shares": "1,500",
+        "issue_price": "5,199"
+      }
+    ]
+  },
+  "에이럭스": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "에이럭스",
+        "date": "2025-04-10 15:49",
+        "round": "-",
+        "additional_shares": "50,000",
+        "issue_price": "2,340"
+      },
+      {
+        "company": "에이럭스",
+        "date": "2025-02-11 17:03",
+        "round": "-",
+        "additional_shares": "53,250",
+        "issue_price": "2,340"
+      },
+      {
+        "company": "에이럭스",
+        "date": "2025-02-11 17:03",
+        "round": "-",
+        "additional_shares": "8,000",
+        "issue_price": "2,340"
+      },
+      {
+        "company": "에이럭스",
+        "date": "2025-01-08 16:49",
+        "round": "-",
+        "additional_shares": "162,470",
+        "issue_price": "2,340"
+      },
+      {
+        "company": "에이럭스",
+        "date": "2024-11-12 15:44",
+        "round": "-",
+        "additional_shares": "113,250",
+        "issue_price": "2,340"
+      }
+    ]
+  },
+  "컨텍": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "컨텍",
+        "date": "2025-05-12 17:36",
+        "round": "-",
+        "additional_shares": "84,320",
+        "issue_price": "1,666"
+      },
+      {
+        "company": "컨텍",
+        "date": "2025-05-12 17:36",
+        "round": "-",
+        "additional_shares": "176,400",
+        "issue_price": "1,666"
+      },
+      {
+        "company": "컨텍",
+        "date": "2024-11-25 17:24",
+        "round": "-",
+        "additional_shares": "51,000",
+        "issue_price": "1,666"
+      },
+      {
+        "company": "컨텍",
+        "date": "2024-04-24 17:54",
+        "round": "-",
+        "additional_shares": "351,160",
+        "issue_price": "1,666"
+      },
+      {
+        "company": "컨텍",
+        "date": "2023-12-15 16:53",
+        "round": "-",
+        "additional_shares": "205,092",
+        "issue_price": "10,833"
+      }
+    ]
+  },
+  "피아이이": {
+    "first_date": "2023-01-01",
+    "last_date": "2025-10-12",
+    "data": [
+      {
+        "company": "피아이이",
+        "date": "2025-07-29 16:32",
+        "round": "-",
+        "additional_shares": "52,500",
+        "issue_price": "6,667"
+      }
+    ]
   }
 }

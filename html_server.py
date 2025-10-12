@@ -121,8 +121,27 @@ def run_function(function_name):
 
 def run_all_companies(user_input):
     try:
-        holdings = get("holdings", [])
-        if not holdings: return
+        # First, update holdings from Excel file
+        print("🔍 Updating holdings list from Excel file...")
+        try:
+            from modules.excel_reader import read_holdings_from_excel, update_system_constants_with_excel
+            holdings_data = read_holdings_from_excel()
+            if holdings_data:
+                holdings = [item['company_name'] for item in holdings_data]
+                update_system_constants_with_excel()
+                print(f"✅ Updated holdings from Excel: {holdings}")
+            else:
+                # Fallback to existing holdings if Excel read fails
+                holdings = get("holdings", [])
+                print(f"⚠️ Excel read failed, using existing holdings: {holdings}")
+        except Exception as e:
+            # Fallback to existing holdings if Excel update fails
+            holdings = get("holdings", [])
+            print(f"⚠️ Excel update failed: {e}, using existing holdings: {holdings}")
+        
+        if not holdings: 
+            print("❌ No holdings found in settings or Excel")
+            return
         print(f"✅ Starting scraping for {len(holdings)} companies...")
         
         for i, company_name in enumerate(holdings, 1):
@@ -142,8 +161,27 @@ def run_all_companies(user_input):
 
 def run_refresh_database(user_input):
     try:
-        holdings = get("holdings", [])
-        if not holdings: return
+        # First, update holdings from Excel file
+        print("🔍 Updating holdings list from Excel file...")
+        try:
+            from modules.excel_reader import read_holdings_from_excel, update_system_constants_with_excel
+            holdings_data = read_holdings_from_excel()
+            if holdings_data:
+                holdings = [item['company_name'] for item in holdings_data]
+                update_system_constants_with_excel()
+                print(f"✅ Updated holdings from Excel: {holdings}")
+            else:
+                # Fallback to existing holdings if Excel read fails
+                holdings = get("holdings", [])
+                print(f"⚠️ Excel read failed, using existing holdings: {holdings}")
+        except Exception as e:
+            # Fallback to existing holdings if Excel update fails
+            holdings = get("holdings", [])
+            print(f"⚠️ Excel update failed: {e}, using existing holdings: {holdings}")
+        
+        if not holdings: 
+            print("❌ No holdings found in settings or Excel")
+            return
         
         mode = user_input.get('mode', 'hist')
         search_mode = get_search_mode(mode)
@@ -180,6 +218,10 @@ def run_refresh_database(user_input):
             
             from datetime import datetime
             today = datetime.now().strftime('%Y-%m-%d')
+            
+            if last_date == today:
+                print(f"✅ Skipping {company_name}: already up-to-date")
+                continue
             
             company_user_input = user_input.copy()
             company_user_input['company_name'] = company_name

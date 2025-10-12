@@ -171,7 +171,8 @@ class KINDScraper:
         for idx, row in enumerate(result_rows):
             try:
                 row_data = self._process_single_row(row)
-                if row_data is not None: page_results.append(row_data)
+                if row_data is not None: 
+                    page_results.append(row_data)
             except Exception as e: 
                 print(f"❌ 행 처리 중 오류: {e}")
                 continue
@@ -185,8 +186,12 @@ class KINDScraper:
                 return None
             print(f"{row_data['title']}: 키워드 있음")
             table_data = self._click_and_extract_data(row)
-            if table_data: row_data['table_data'] = table_data
-            return row_data
+            if table_data: 
+                row_data['table_data'] = table_data
+                return row_data
+            else:
+                row_data['table_data'] = [{"row_index": 0, "data": ["unknown"]}]
+                return row_data
         except Exception: return None
 
     def _click_and_extract_data(self, row):
@@ -231,7 +236,10 @@ class KINDScraper:
                             table_data = self._extract_table_data(self.driver, self.wait)
                             self.driver.close()
                             self.driver.switch_to.window(base_handle)
-                            return table_data    
+                            if table_data:
+                                return table_data
+                            else:
+                                return None    
                 except Exception as e:
                     try: self.driver.switch_to.window(base_handle)
                     except Exception: pass
@@ -331,13 +339,29 @@ class KINDScraper:
         chrome_options.add_argument("--window-size=1600,1000")
 
         try:
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
+            # Set Chrome binary path for macOS
+            chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            
+            # Try to use ChromeDriver directly without webdriver-manager
+            print("🔍 Chrome driver 시작 중...")
+            driver = webdriver.Chrome(options=chrome_options)
             driver.set_page_load_timeout(get("long_loadtime"))
             wait = WebDriverWait(driver, get("long_loadtime"))
             print("✅ Chrome driver 로딩 완료")
             return driver, wait
-        except Exception as e: raise Exception(f"❌ Chrome driver 로딩 실패: {e}")
+        except Exception as e: 
+            print(f"❌ Chrome driver 실패: {e}")
+            # Fallback: try with webdriver-manager as last resort
+            try:
+                print("🔄 Fallback: ChromeDriverManager 사용 시도...")
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                driver.set_page_load_timeout(get("long_loadtime"))
+                wait = WebDriverWait(driver, get("long_loadtime"))
+                print("✅ Chrome driver 로딩 완료 (ChromeDriverManager)")
+                return driver, wait
+            except Exception as e2:
+                raise Exception(f"❌ Chrome driver 로딩 실패: {e2}")
 
     def _find_result_rows(self, driver):
         result_selector = get("result_row_selector")
