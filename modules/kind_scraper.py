@@ -185,16 +185,16 @@ class KINDScraper:
                 print(f"{row_data['title']}: 키워드 없음")
                 return None
             print(f"{row_data['title']}: 키워드 있음")
-            table_data = self._click_and_extract_data(row)
+            table_data = self._click_and_extract_data(row, row_data['title'])
             if table_data: 
                 row_data['table_data'] = table_data
                 return row_data
             else:
-                row_data['table_data'] = [{"row_index": 0, "data": ["unknown"]}]
+                row_data['table_data'] = []
                 return row_data
         except Exception: return None
 
-    def _click_and_extract_data(self, row):
+    def _click_and_extract_data(self, row, title):
         buffertime = get("buffer_time")
         base_handle = self.driver.current_window_handle        
         try:
@@ -239,8 +239,8 @@ class KINDScraper:
                             if table_data:
                                 return table_data
                             else:
-                                return None    
-                except Exception as e:
+                                return None
+                except Exception:
                     try: self.driver.switch_to.window(base_handle)
                     except Exception: pass
                     continue
@@ -255,7 +255,7 @@ class KINDScraper:
             if not search_mode.keywords_list: return True
             title = row_data.get('title')
             return any(keyword in title for keyword in search_mode.keywords_list)
-        except Exception as e: return False
+        except Exception: return False
 
     def _extract_row_basic_data(self, row):
         try:
