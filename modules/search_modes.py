@@ -11,11 +11,13 @@ except ImportError:
 
 try:
     from ..designlib.ui_components import BasicPage
+    from ..designlib.generate_pages_simple import execution_setup_page
 except ImportError:
     parent_dir = os.path.dirname(os.path.dirname(__file__))
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
     from designlib.ui_components import BasicPage  # type: ignore
+    from designlib.generate_pages_simple import execution_setup_page  # type: ignore
 
 class BaseDataProcessor(ABC):
     def __init__(self, mode_name): self.mode_name = mode_name
@@ -197,9 +199,13 @@ class SearchMode:
         self.run_function         = config.get('run_function')
     
     def generate_page(self):
-        # Simplified: redirect to main page since individual company pages are no longer needed
-        from designlib.generate_pages_simple import main_page
-        return main_page()
+        config = {
+            "title": self.title,
+            "database_address": f"resources/{self.database_name}",
+            "execution_message": self.execution_message,
+            "run_function": self.run_function,  
+        }
+        return execution_setup_page(config)
     
     def generate_dataset_page(self, company_name=None, round_filter=''):
         """Generate dataset page using real data from database files"""

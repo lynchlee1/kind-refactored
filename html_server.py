@@ -38,21 +38,26 @@ def index(): return main_page()
 @app.route('/main_page.html')
 def serve_main_page(): return main_page()
 
-# Simplified routes - all redirect to main page
 @app.route('/hist_page.html')
-def hist_page_route(): return main_page()
+def hist_page_route(): return hist_page()
 
 @app.route('/prc_page.html')
-def prc_page_route(): return main_page()
+def prc_page_route(): return prc_page()
 
 @app.route('/dev_mode.html')
-def dev_mode_page_route(): return main_page()
+def dev_mode_page_route(): return dev_mode_page()
 
 @app.route('/hist_page_dataset.html')
-def hist_dataset_page_route(): return main_page()
+def hist_dataset_page_route(): 
+    company_name = request.args.get('company')
+    round_filter = request.args.get('round', '')
+    return hist_dataset_page(company_name, round_filter)
 
 @app.route('/prc_page_dataset.html')
-def prc_dataset_page_route(): return main_page()
+def prc_dataset_page_route(): 
+    company_name = request.args.get('company')
+    round_filter = request.args.get('round', '')
+    return prc_dataset_page(company_name, round_filter)
 
 @app.route('/logo.jpg')
 def logo(): return send_from_directory(os.path.join(ROOT_DIR, 'resources'), 'logo.jpg')
@@ -68,21 +73,40 @@ def submit():
         return jsonify({'success': True})
     except Exception as e: return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/api/run-all-companies', methods=['POST'])
-def run_all_companies_api():
-    """New simplified API endpoint for running all companies"""
+@app.route('/api/run/<function_name>', methods=['POST'])
+def run_function(function_name):
+    global result_data
     try:
-        data = request.get_json() or {}
+        data = request.get_json()
+        if not data.get('company_name'): return jsonify({'success': False, 'message': 'Company name is required'})
+        
+        function_to_mode = {
+            'run_hist_scraper': 'hist',
+            'run_prc_scraper': 'prc'
+        }
+        
+        mode = function_to_mode.get(function_name)
+        if not mode:
+            return jsonify({'success': False, 'message': f'Unknown function: {function_name}'})
         
         user_input = {
-            'from_date': data.get('from_date', '2021-01-01'),
-            'to_date': data.get('to_date', '2025-01-01'),
+            'mode': mode,
+            'company_name': data['company_name'],
+            'from_date': data.get('from_date', '2022-01-01'),
+            'to_date': data.get('to_date', '2024-12-31'),
             'headless': data.get('headless', False)
         }
         
         def run_scraper():
             try:
-                run_all_companies_simplified(user_input)
+                if data.get('refresh_mode', False): # Renew database
+                    if user_input['company_name'] == 'holdings_refresh':
+                        user_input['company_name'] = '전체 기업'
+                    run_refresh_database(user_input)
+                elif user_input['company_name'] == '전체 기업':
+                    run_all_companies(user_input)
+                else:
+                    run_once(user_input)
             except Exception as e:
                 print(f"Error in scraper: {e}")
         
@@ -90,33 +114,35 @@ def run_all_companies_api():
         thread.daemon = True
         thread.start()
         
-        return jsonify({'success': True, 'message': '전체 실행이 시작되었습니다'})
+        return jsonify({'success': True, 'message': f'{function_name} started'})
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
 def run_all_companies(user_input):
     try:
+        # First, update holdings from Excel file
+        print("🔍 Updating holdings list from Excel file...")
         try:
-            from modules.excel_reader import read_holdings_from_excel
+            from modules.excel_reader import read_holdings_from_excel, update_system_constants_with_excel
             holdings_data = read_holdings_from_excel()
             if holdings_data:
-                # Handle both old format (list of strings) and new format (list of dicts)
-                if isinstance(holdings_data[0], dict):
-                    holdings = [item['company'] for item in holdings_data]
-                    print(f"✅ Read {len(holdings_data)} company+round combinations from Excel: {holdings_data}")
-                else:
-                    holdings = holdings_data
-                    print(f"✅ Read {len(holdings)} companies from Excel: {holdings}")
+                holdings = [item['company_name'] for item in holdings_data]
+                update_system_constants_with_excel()
+                print(f"✅ Updated holdings from Excel: {holdings}")
             else:
+                # Fallback to existing holdings if Excel read fails
                 holdings = get("holdings", [])
                 print(f"⚠️ Excel read failed, using existing holdings: {holdings}")
         except Exception as e:
+            # Fallback to existing holdings if Excel update fails
             holdings = get("holdings", [])
-            print(f"⚠️ Excel read failed: {e}, using existing holdings: {holdings}")
+            print(f"⚠️ Excel update failed: {e}, using existing holdings: {holdings}")
+        
         if not holdings: 
             print("❌ No holdings found in settings or Excel")
             return
+        print(f"✅ Starting scraping for {len(holdings)} companies...")
         
         for i, company_name in enumerate(holdings, 1):
             print(f"✅ Processing company {i}/{len(holdings)}: {company_name}")
@@ -133,133 +159,25 @@ def run_all_companies(user_input):
     except Exception as e:
         print(f"❌ Error in run_all_companies: {e}")
 
-def run_all_companies_simplified(user_input):
-    """Simplified function to run all companies from Excel"""
-    try:
-        from modules.excel_reader import read_holdings_from_excel
-        holdings_data = read_holdings_from_excel()
-        
-        if not holdings_data:
-            print("❌ No holdings found in Excel file")
-            return
-        
-        # Handle both old format (list of strings) and new format (list of dicts)
-        if isinstance(holdings_data[0], dict):
-            print(f"✅ Read {len(holdings_data)} company+round combinations from Excel")
-            # Use the new company+round algorithm
-            run_with_company_round_combinations_simplified(user_input, holdings_data)
-        else:
-            print(f"✅ Read {len(holdings_data)} companies from Excel (legacy format)")
-            # Use simple company processing
-            for i, company_name in enumerate(holdings_data, 1):
-                print(f"✅ Processing company {i}/{len(holdings_data)}: {company_name}")
-                company_user_input = user_input.copy()
-                company_user_input['company_name'] = company_name
-                
-                try:
-                    run_with_original_algorithm(company_user_input, 'hist', get_search_mode('hist'))
-                    print(f"✅ Completed: {company_name}")
-                except Exception as e:
-                    print(f"❌ Failed for {company_name}: {e}")
-                    continue
-        
-    except Exception as e:
-        print(f"❌ Error in run_all_companies_simplified: {e}")
-
-def run_with_company_round_combinations_simplified(user_input, holdings_data):
-    """Simplified version of company+round processing"""
-    from modules.search_modes import get_search_mode
-    
-    mode = 'hist'  # Default mode
-    search_mode = get_search_mode(mode)
-    
-    print(f"✅ Found {len(holdings_data)} company+round combinations to process")
-    
-    all_processed_data = []
-    
-    for i, combination in enumerate(holdings_data, 1):
-        company = combination['company']
-        round_num = combination['round']
-        keyword = combination['keyword']
-        
-        print(f"✅ Processing combination {i}/{len(holdings_data)}: {company} - {round_num}")
-        
-        config = {
-            'from_date': user_input['from_date'],
-            'to_date': user_input['to_date'],
-            'company': company,
-            'keyword': keyword
-        }
-
-        scraper = KINDScraper(
-            config=config,
-            headless=user_input['headless'],
-            process_type=mode
-        )
-
-        try:
-            # Use the new details algorithm
-            items = scraper.run_with_details_algorithm()
-            
-            if items:
-                # Process the data
-                data_processor = search_mode.data_processor_class()
-                processed_data = data_processor.process_raw_data(items)
-                
-                # Add company and round info to each record
-                for record in processed_data:
-                    record['company'] = company
-                    record['round'] = round_num
-                
-                all_processed_data.extend(processed_data)
-                print(f"✅ Processed {len(processed_data)} records for {company} - {round_num}")
-            else:
-                print(f"⚠️ No data found for {company} - {round_num}")
-                
-        except Exception as e:
-            print(f"❌ Failed to process {company} - {round_num}: {e}")
-            continue
-    
-    # Save all processed data to database
-    if all_processed_data:
-        save_config = {
-            'company': '전체 기업',
-            'processed_data': all_processed_data,
-            'key_list': search_mode.columns,
-            'from_date': user_input['from_date'],
-            'to_date': user_input['to_date'],
-            'db_filename': search_mode.database_name
-        }
-
-        data_processor = search_mode.data_processor_class()
-        data_processor.save_to_database(save_config)
-        print(f"✅ 작업이 완료되었습니다! ({len(all_processed_data)} records processed)")
-    else:
-        print(f"❌ No data was processed for any combinations")
-
 def run_refresh_database(user_input):
     try:
-        # Read holdings directly from Excel file without updating system constants
-        print("🔍 Reading holdings list from Excel file...")
+        # First, update holdings from Excel file
+        print("🔍 Updating holdings list from Excel file...")
         try:
-            from modules.excel_reader import read_holdings_from_excel
+            from modules.excel_reader import read_holdings_from_excel, update_system_constants_with_excel
             holdings_data = read_holdings_from_excel()
             if holdings_data:
-                # Handle both old format (list of strings) and new format (list of dicts)
-                if isinstance(holdings_data[0], dict):
-                    holdings = [item['company'] for item in holdings_data]
-                    print(f"✅ Read {len(holdings_data)} company+round combinations from Excel: {holdings_data}")
-                else:
-                    holdings = holdings_data
-                    print(f"✅ Read {len(holdings)} companies from Excel: {holdings}")
+                holdings = [item['company_name'] for item in holdings_data]
+                update_system_constants_with_excel()
+                print(f"✅ Updated holdings from Excel: {holdings}")
             else:
                 # Fallback to existing holdings if Excel read fails
                 holdings = get("holdings", [])
                 print(f"⚠️ Excel read failed, using existing holdings: {holdings}")
         except Exception as e:
-            # Fallback to existing holdings if Excel read fails
+            # Fallback to existing holdings if Excel update fails
             holdings = get("holdings", [])
-            print(f"⚠️ Excel read failed: {e}, using existing holdings: {holdings}")
+            print(f"⚠️ Excel update failed: {e}, using existing holdings: {holdings}")
         
         if not holdings: 
             print("❌ No holdings found in settings or Excel")
@@ -275,20 +193,8 @@ def run_refresh_database(user_input):
         
         database = {}
         if os.path.exists(db_path):
-            try:
-                with open(db_path, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                    if content:  # Check if file is not empty
-                        database = json.loads(content)
-                    else:
-                        print(f"⚠️ Database file {db_path} is empty, starting with empty database")
-                        database = {}
-            except json.JSONDecodeError as e:
-                print(f"⚠️ Invalid JSON in database file {db_path}: {e}, starting with empty database")
-                database = {}
-            except Exception as e:
-                print(f"⚠️ Error reading database file {db_path}: {e}, starting with empty database")
-                database = {}
+            with open(db_path, 'r', encoding='utf-8') as f:
+                database = json.load(f)
         
         print(f"✅ Starting database refresh for {len(holdings)} companies...")
         
@@ -344,100 +250,6 @@ def run_once(user_input):
     if not search_mode:
         raise Exception(f"❌ Unknown search mode: {mode}")
 
-    # Check if we have company+round data from Excel
-    from modules.excel_reader import read_holdings_from_excel
-    holdings_data = read_holdings_from_excel()
-    
-    if holdings_data and isinstance(holdings_data[0], dict):
-        # Use the new algorithm for company+round combinations
-        run_with_company_round_combinations(user_input, holdings_data, mode, search_mode)
-    else:
-        # Use the original algorithm for single company searches
-        run_with_original_algorithm(user_input, mode, search_mode)
-
-def run_with_company_round_combinations(user_input, holdings_data, mode, search_mode):
-    """Run scraper for each company+round combination using the details algorithm"""
-    company_name = user_input['company_name']
-    
-    # Filter holdings for the specific company if not running for all companies
-    if company_name != '전체 기업':
-        target_combinations = [item for item in holdings_data if item['company'] == company_name]
-        if not target_combinations:
-            print(f"❌ No company+round combinations found for {company_name}")
-            return
-    else:
-        target_combinations = holdings_data
-    
-    print(f"✅ Found {len(target_combinations)} company+round combinations to process")
-    
-    all_processed_data = []
-    
-    for i, combination in enumerate(target_combinations, 1):
-        company = combination['company']
-        round_num = combination['round']
-        keyword = combination['keyword']
-        
-        print(f"✅ Processing combination {i}/{len(target_combinations)}: {company} - {round_num}")
-        
-        config = {
-            'from_date': user_input['from_date'],
-            'to_date': user_input['to_date'],
-            'company': company,
-            'keyword': keyword
-        }
-
-        scraper = KINDScraper(
-            config=config,
-            headless=user_input['headless'],
-            process_type=mode
-        )
-
-        try:
-            # Use the new details algorithm
-            items = scraper.run_with_details_algorithm()
-            
-            if items:
-                # Process the data
-                data_processor = search_mode.data_processor_class()
-                processed_data = data_processor.process_raw_data(items)
-                
-                # Add company and round info to each record
-                for record in processed_data:
-                    record['company'] = company
-                    record['round'] = round_num
-                
-                all_processed_data.extend(processed_data)
-                print(f"✅ Processed {len(processed_data)} records for {company} - {round_num}")
-            else:
-                print(f"⚠️ No data found for {company} - {round_num}")
-                
-        except Exception as e:
-            print(f"❌ Failed to process {company} - {round_num}: {e}")
-            continue
-    
-    # Save all processed data to database
-    if all_processed_data:
-        save_config = {
-            'company': user_input['company_name'],
-            'processed_data': all_processed_data,
-            'key_list': search_mode.columns,
-            'from_date': user_input['from_date'],
-            'to_date': user_input['to_date'],
-            'db_filename': search_mode.database_name
-        }
-        
-        if 'original_search_first_date' in user_input:
-            save_config['original_search_first_date'] = user_input['original_search_first_date']
-            save_config['original_search_last_date'] = user_input['original_search_last_date']
-
-        data_processor = search_mode.data_processor_class()
-        data_processor.save_to_database(save_config)
-        print(f"✅ {search_mode.title} 작업이 완료되었습니다! ({len(all_processed_data)} records processed)")
-    else:
-        print(f"❌ No data was processed for any combinations")
-
-def run_with_original_algorithm(user_input, mode, search_mode):
-    """Run scraper using the original algorithm for single company searches"""
     keyword = search_mode.keyword
     config = {
         'from_date': user_input['from_date'],
@@ -452,7 +264,7 @@ def run_with_original_algorithm(user_input, mode, search_mode):
         process_type=mode
     )
 
-    items = scraper.run_with_details_algorithm()
+    items = scraper.run()
 
     config = {
         'from_date': user_input['from_date'],
@@ -485,7 +297,84 @@ def run_with_original_algorithm(user_input, mode, search_mode):
     data_processor.save_to_database(save_config)
     print(f"✅ {search_mode.title} 작업이 완료되었습니다!")
 
-# Simplified API - only keep essential endpoints
+@app.route('/api/company-info', methods=['GET'])
+def get_company_info():
+    try:
+        company = request.args.get('company', '').strip()
+        mode = request.args.get('mode', 'hist').strip().lower()
+        
+        if not company:
+            return jsonify({'found': False})
+        
+        search_mode = get_search_mode(mode)
+        if not search_mode:
+            return jsonify({'found': False, 'error': f'Unknown mode: {mode}'})
+        
+        db_filename = search_mode.database_name
+        db_path = os.path.join(ROOT_DIR, 'resources', db_filename)
+        
+        if not os.path.exists(db_path):
+            return jsonify({'found': False})
+        
+        with open(db_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        entry = data.get(company, {})
+        if not entry:
+            return jsonify({'found': False})
+        
+        return jsonify({
+            'found': True,
+            'first_date': entry.get('first_date'),
+            'last_date': entry.get('last_date'),
+            'count': len(entry.get('data', []))
+        })
+        
+    except Exception as e:
+        return jsonify({'found': False, 'error': str(e)})
+
+@app.route('/api/refresh-holdings', methods=['POST'])
+def refresh_holdings_from_excel():
+    try:
+        data = request.get_json() or {}
+        excel_path = data.get('excel_path')  # Optional custom path
+        
+        holdings = read_holdings_from_excel(excel_path)
+        
+        if not holdings:
+            return jsonify({
+                'success': False, 
+                'message': 'No holdings found in Excel file. Please check the \'Holdings\' sheet and \'기업명\' column.'
+            })
+        
+        success = update_system_constants_with_excel(excel_path)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Successfully updated holdings list with {len(holdings)} companies',
+                'holdings': holdings
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to update system constants'
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/get-holdings', methods=['GET'])
+def get_current_holdings():
+    try:
+        holdings = get("holdings", [])
+        return jsonify({
+            'success': True,
+            'holdings': holdings,
+            'count': len(holdings)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/export-to-excel', methods=['POST'])
 def export_to_excel():
@@ -506,7 +395,117 @@ def get_database_summary_api():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
-# Removed complex dev settings and company management APIs for simplification
+@app.route('/api/dev-settings', methods=['GET'])
+def get_dev_settings():
+    try:
+        from modules.settings import get_section
+        timing = get_section('timing')
+        selectors = get_section('selectors')
+        return jsonify({
+            'timing': timing,
+            'selectors': selectors
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/save-dev-settings', methods=['POST'])
+def save_dev_settings():
+    try:
+        data = request.get_json()
+        
+        try:
+            timing = data.get('timing', {}) or {}
+            numeric_keys = [
+                'buffer_time', 'short_loadtime', 'long_loadtime',
+            ]
+            for key in numeric_keys:
+                if key in timing:
+                    val = timing[key]
+                    if isinstance(val, str):
+                        try:
+                            if val.strip().isdigit():
+                                timing[key] = int(val)
+                            else:
+                                timing[key] = float(val)
+                        except Exception:
+                            pass
+            data['timing'] = timing
+        except Exception:
+            pass
+
+        settings_path = os.path.join(ROOT_DIR, 'resources', 'system_constants.json')
+        with open(settings_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/reset-dev-settings', methods=['POST'])
+def reset_dev_settings():
+    try:
+        default_file = os.path.join(ROOT_DIR, 'resources', 'default_constants.json')
+        
+        with open(default_file, 'r', encoding='utf-8') as f:
+            default_settings = json.load(f)
+        
+        settings_path = os.path.join(ROOT_DIR, 'resources', 'system_constants.json')
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            current_settings = json.load(f)
+        
+        current_settings['timing'] = default_settings.get('timing', {})
+        current_settings['selectors'] = default_settings.get('selectors', {})
+        
+        with open(settings_path, 'w', encoding='utf-8') as f:
+            json.dump(current_settings, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/discard-company-data', methods=['POST'])
+def discard_company_data():
+    """Delete a company's data from the database"""
+    try:
+        data = request.get_json()
+        company_name = data.get('company_name', '').strip()
+        mode = data.get('mode', 'hist')
+        
+        if not company_name:
+            return jsonify({'success': False, 'message': 'Company name is required'})
+        
+        # Get the appropriate database file based on mode
+        search_mode = get_search_mode(mode)
+        if not search_mode:
+            return jsonify({'success': False, 'message': f'Unknown mode: {mode}'})
+        
+        db_path = os.path.join(ROOT_DIR, 'resources', search_mode.database_name)
+        
+        # Load existing database
+        database = {}
+        if os.path.exists(db_path):
+            with open(db_path, 'r', encoding='utf-8') as f:
+                database = json.load(f)
+        
+        # Check if company exists in database
+        if company_name not in database:
+            return jsonify({'success': False, 'message': f'Company "{company_name}" not found in {mode} database'})
+        
+        # Remove the company from database
+        del database[company_name]
+        
+        # Save updated database
+        with open(db_path, 'w', encoding='utf-8') as f:
+            json.dump(database, f, ensure_ascii=False, indent=2)
+        
+        mode_text = '추가상장 기록' if mode == 'hist' else '전환가액 변동'
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully deleted {company_name} from {mode_text} database'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 def start_server():
     global server_running, current_port
@@ -548,23 +547,32 @@ def get_user_input():
     return None
 
 def main():
-    """Main function - starts web server and opens HTML interface"""
     global server_running
     try:
-        print("✅ Starting application...")
+        while True:
+            user_input = get_user_input()
+            if not user_input:
+                break
+            try:
+                mode = user_input.get('mode', 'hist')
+                if mode not in ['hist', 'prc']:
+                    mode = 'hist'
+                
+                user_input['mode'] = mode
+                
+                print(f"✅ Starting {mode} scraper...")
+                run_once(user_input)
+                print(f"✅ {mode.upper()} scraper completed successfully!")
+                
+            except Exception as e:
+                print(f"❌ Scraper failed: {e}")
+                import traceback
+                traceback.print_exc()
         
-        # Start server and open HTML interface
-        user_input = get_user_input()
-        if user_input:
-            print(f"✅ Received input: {user_input}")
-            # Process the input if needed (for backward compatibility)
+        print("✅ Program terminated.")
         
-        # Keep the server running
-        while server_running:
-            time.sleep(1)
-            
     except Exception as e: 
-        print(f"❌ Application failed: {e}")
+        print(f"❌ Execution failed: {e}")
         import traceback
         traceback.print_exc()
     finally:
