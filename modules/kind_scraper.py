@@ -65,14 +65,6 @@ class KINDScraper:
             if not final_state: print("✅ 공시유형 초기화 해제 완료")
             time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ 공시유형 초기화 해제 실패: {e}")
-
-    def _click_button_XPATH(self, selector):
-        try:
-            button = self.wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
-            button.click()
-            print(f"✅ XPATH {selector} 버튼 클릭 완료")
-            time.sleep(get("buffer_time"))
-        except Exception as e: raise Exception(f"❌ XPATH {selector} 버튼 클릭 실패: {e}")
     
     def _click_button_CSS(self, selector):
         try:
@@ -81,20 +73,6 @@ class KINDScraper:
             print(f"✅ CSS {selector} 버튼 클릭 완료")
             time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ CSS {selector} 클릭 실패: {e}")
-
-    def _click_button(self, css_selector, xpath_selector):
-        try: self._click_button_CSS(css_selector)
-        except Exception: self._click_button_XPATH(xpath_selector)
-
-    def _fill_input_XPATH(self, selector, value):
-        if value is None: return
-        try:
-            input = self.driver.find_element(By.XPATH, selector)
-            input.clear()
-            input.send_keys(value)
-            print(f"✅ XPATH {selector} 입력 완료")
-            time.sleep(get("buffer_time"))
-        except Exception as e: raise Exception(f"❌ XPATH {selector} 입력 실패: {e}")
 
     def _fill_input_CSS(self, selector, value):
         if value is None: return
@@ -106,10 +84,72 @@ class KINDScraper:
             time.sleep(get("buffer_time"))
         except Exception as e: raise Exception(f"❌ CSS {selector} 입력 실패: {e}")
 
-    def _fill_input(self, css_selector, xpath_selector, value):
+    def _click_button(self, selector, in_iframe=False):
+        try:
+            # Switch to iframe if needed
+            if in_iframe:
+                iframe_selector = get("popup_iframe")
+                iframe = self.driver.find_element(By.CSS_SELECTOR, iframe_selector)
+                self.driver.switch_to.frame(iframe)
+                print(f"🔄 Switched to iframe: {iframe_selector}")
+            
+            button = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+            self.driver.execute_script("arguments[0].click();", button)
+            print(f"✅ CSS {selector} 버튼 클릭 완료")
+            time.sleep(get("buffer_time"))
+            
+            # Switch back to main frame if we switched to iframe
+            if in_iframe:
+                self.driver.switch_to.default_content()
+                print(f"🔄 Switched back to main frame")
+                
+        except Exception as e: 
+            # Make sure to switch back to main frame on error
+            if in_iframe:
+                try:
+                    self.driver.switch_to.default_content()
+                except:
+                    pass
+            raise Exception(f"❌ CSS {selector} 클릭 실패: {e}")
+
+    def _fill_input(self, selector, value, in_iframe=False):
         if value is None: return
-        try: self._fill_input_CSS(css_selector, value)
-        except Exception: self._fill_input_XPATH(xpath_selector, value)
+        try:
+            # Switch to iframe if needed
+            if in_iframe:
+                iframe_selector = get("popup_iframe")
+                iframe = self.driver.find_element(By.CSS_SELECTOR, iframe_selector)
+                self.driver.switch_to.frame(iframe)
+                print(f"🔄 Switched to iframe: {iframe_selector}")
+            
+            # Check if selector is XPath or CSS
+            if selector.startswith("//") or selector.startswith(".//"):
+                input = self.driver.find_element(By.XPATH, selector)
+                print(f"✅ XPATH {selector} 입력 완료")
+            else:
+                input = self.driver.find_element(By.CSS_SELECTOR, selector)
+                print(f"✅ CSS {selector} 입력 완료")
+            
+            # Use JavaScript click to bypass popup overlay
+            self.driver.execute_script("arguments[0].click();", input)
+            time.sleep(0.5)
+            input.clear()
+            input.send_keys(value)
+            time.sleep(get("buffer_time"))
+            
+            # Switch back to main frame if we switched to iframe
+            if in_iframe:
+                self.driver.switch_to.default_content()
+                print(f"🔄 Switched back to main frame")
+                
+        except Exception as e: 
+            # Make sure to switch back to main frame on error
+            if in_iframe:
+                try:
+                    self.driver.switch_to.default_content()
+                except:
+                    pass
+            raise Exception(f"❌ {selector} 입력 실패: {e}")
     
     def _fill_dates(self):
         try:
@@ -278,21 +318,174 @@ class KINDScraper:
             }
         except Exception as e: raise Exception(f"❌ 행 데이터 추출 실패: {e}")
 
-    def run(self):
+
+    def run_with_details_algorithm(self):
+        """
+        Run scraper using the details page algorithm from scraper.py
+        This method searches for company+round combinations using the popup iframe approach
+        """
         try:
             self.setup()
+            
+            print(f"\nStarting scrape for company: {self.config['company']}")
+            print(f"Search keyword: {self.config['keyword']}")
+            
+            print("Opening details page...")
             self.driver.get(get("details_url"))
-            print(f"✅ 접속 완료")
             time.sleep(get("buffer_time"))
             
-            results = self.search()
+            print("Clicking search button...")
+            self._click_button(get("search_button_selector"))
             time.sleep(get("buffer_time"))
+            
+            print("Filling company name...")
+            self._fill_input(get("company_input_selector"), self.config["company"], in_iframe=True)
+            self._click_button(get("company_search_selector"), in_iframe=True)
+            time.sleep(get("buffer_time"))
+            
+            print("Switching to popup iframe...")
+            iframe_selector = get("popup_iframe")
+            iframe = self.driver.find_element(By.CSS_SELECTOR, iframe_selector)
+            self.driver.switch_to.frame(iframe)
+            
+            container = self.driver.find_element(By.CSS_SELECTOR, "#group74 #group118 #isinList")
+            items = container.find_elements(By.CSS_SELECTOR, '[id^="isinList_"][id$="_group178"]')
+            searched_keys = []
+            
+            print("Searching for matching items...")
+            for _, item in enumerate(items):
+                text = self.driver.execute_script("return arguments[0].textContent.trim();", item) or ""
+                searched_keys.append(KINDScraper._fmtkey(text))
+            
+            pos = [i for i in range(len(searched_keys)) if searched_keys[i] == self.config.get("keyword")]
+            if not pos:
+                print("No matches found")
+                return []
+            
+            target = pos[0]
+            print(f"Found match at position {target}")
+            self._click_button(f"#isinList_{target}_ISIN_ROW")
+            self.driver.switch_to.default_content()
+            
+            print("Filling dates...")
+            self._fill_dates()
+            time.sleep(get("buffer_time"))
+            
+            print("Starting data collection...")
+            self._click_button("#image2")
+            time.sleep(get("short_loadtime"))
 
-            self._save_results(results)
-            print(f"✅ 실행 완료")
-            return results
-        except Exception as e: raise Exception(f"❌ 실행 실패: {e}")
-        finally: self.cleanup()
+            all_rows_dicts = []
+            previous_page_key = None
+            page_num = 1
+            
+            while True:
+                try:
+                    print(f"\nProcessing page {page_num}...")
+                    tbody = self.driver.find_element(By.CSS_SELECTOR, "#grid1_body_tbody")
+                    rows = tbody.find_elements(By.TAG_NAME, "tr")
+                    headers = []
+                    header_cells = []
+                    
+                    if rows:
+                        header_cells = rows[0].find_elements(By.TAG_NAME, "th") or rows[0].find_elements(By.TAG_NAME, "td")
+                        headers = self.driver.execute_script(
+                            """
+                            var result = [];
+                            for (var i = 0; i < arguments[0].length; i++) {
+                                var v = arguments[0][i].textContent.trim();
+                                result.push(v || `col_${i}`);
+                            }
+                            return result;
+                            """,
+                            header_cells
+                        )
+                    
+                    page_key = None
+                    if rows:
+                        first_row_cells = rows[0].find_elements(By.TAG_NAME, "td") or rows[0].find_elements(By.TAG_NAME, "th")
+                        first_vals = self.driver.execute_script(
+                            """
+                            var result = [];
+                            for (var i = 0; i < arguments[0].length; i++) {
+                                result.push(arguments[0][i].textContent.trim());
+                            }
+                            return result;
+                            """,
+                            first_row_cells
+                        )
+                        page_key = "|".join(first_vals)
+                    
+                    if previous_page_key is not None and page_key == previous_page_key:
+                        print("Reached duplicate page, stopping")
+                        break
+                    
+                    data_dicts = []
+                    start_idx = 1 if header_cells else 0
+                    
+                    for r_idx in range(start_idx, len(rows)):
+                        row = rows[r_idx]
+                        cells = row.find_elements(By.TAG_NAME, "td") or row.find_elements(By.TAG_NAME, "th")
+                        if not cells:
+                            continue
+                        
+                        values = self.driver.execute_script(
+                            """
+                            var result = [];
+                            for (var i = 0; i < arguments[0].length; i++) {
+                                result.push(arguments[0][i].textContent.trim());
+                            }
+                            return result;
+                            """,
+                            cells
+                        )
+                        
+                        row_dict = {}
+                        try:
+                            row_dict["title"] = values[2]
+                            row_dict["exc_start"] = values[3]
+                            row_dict["exc_end"] = values[4]
+                            row_dict["date"] = values[5]
+                            row_dict["exc_amount"] = values[6]
+                            row_dict["exc_shares"] = values[8]
+                            row_dict["exc_price"] = values[9]
+                            row_dict["listing_date"] = values[10]
+                        except Exception:
+                            pass
+                        data_dicts.append(row_dict)
+                    
+                    all_rows_dicts.extend(data_dicts)
+                    previous_page_key = page_key
+                    
+                    try:
+                        self._click_button("#gridPaging_next_btn")
+                        time.sleep(get("short_loadtime"))
+                        page_num += 1
+                    except Exception:
+                        print("No more pages")
+                        break
+                        
+                except Exception as e:
+                    print(f"Error processing page {page_num}: {e}")
+                    break
+            
+            self._save_results(all_rows_dicts)
+            return all_rows_dicts
+            
+        finally:
+            self.cleanup()
+
+    def _fmtkey(key):
+        key=str(key).replace(' ','')
+        types_str = [
+            'EB', 'eb',
+            'CB', 'cb',
+            'BW', 'bw',
+        ]
+        for abbr in types_str: key=key.replace(abbr,'')
+        idx=key.find('(')
+        if idx!=-1: key=key[:idx]
+        return key
 
     def _save_results(self, results):
         try:
@@ -339,10 +532,6 @@ class KINDScraper:
         chrome_options.add_argument("--window-size=1600,1000")
 
         try:
-            # Set Chrome binary path for macOS
-            chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            
-            # Try to use ChromeDriver directly without webdriver-manager
             print("🔍 Chrome driver 시작 중...")
             driver = webdriver.Chrome(options=chrome_options)
             driver.set_page_load_timeout(get("long_loadtime"))

@@ -9,8 +9,8 @@ class BasicPage:
         self.elements = []
         self.scripts = []
     
-    def element_header(self, logo_url="/logo.jpg", logo_width="320px", logo_height="100px", 
-                      title="KIND 행사내역 조회 프로그램", subtitle="타임폴리오 대체투자본부", show_logo=False, show_subtitle=False):
+    def element_header(self, logo_url="/logo.jpg", logo_width="160px", logo_height="50px", 
+                      title="", subtitle="", show_logo=False, show_subtitle=False):
         logo_html = ""
         if show_logo:
             logo_html = f'''
@@ -398,8 +398,8 @@ class BasicPage:
         }}
         
         .logo {{
-            width: 320px;
-            height: 100px;
+            width: 160px;
+            height: 50px;
             border-radius: 15px;
             margin: 0 auto 20px;
             display: flex;

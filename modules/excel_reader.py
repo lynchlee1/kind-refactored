@@ -8,18 +8,38 @@ def read_holdings_from_excel(excel_path=None):
             modules_dir = os.path.dirname(os.path.abspath(__file__))
             root_dir = os.path.dirname(modules_dir)
             excel_path = os.path.join(root_dir, 'results.xlsx')
+        if not os.path.exists(excel_path): raise FileNotFoundError(f"results.xlsx 파일이 없습니다.")
         
-        if not os.path.exists(excel_path):
-            raise FileNotFoundError(f"Excel file not found: {excel_path}")
-        
+        # Read the Holdings sheet
         df = pd.read_excel(excel_path, sheet_name='Holdings')
-        if '기업명' not in df.columns:
-            raise ValueError(f"'기업명' column not found in 'Holdings' sheet. Available columns: {list(df.columns)}")
-        holdings = df['기업명'].dropna().tolist()        
-        holdings = [str(company).strip() for company in holdings if str(company).strip()]
-        print(f"✅ Successfully read {len(holdings)} companies from Excel file:")
-        return holdings
-    except Exception: return []
+        
+        if '기업명' not in df.columns: 
+            raise ValueError(f"'Holdings' 시트 혹은 '기업명' 열이 없습니다.")
+        
+        # If there's a '회차' column, read both columns; otherwise just company names
+        if '회차' in df.columns:
+            holdings_data = []
+            for _, row in df.iterrows():
+                company = str(row['기업명']).strip() if pd.notna(row['기업명']) else ''
+                round_num = str(row['회차']).strip() if pd.notna(row['회차']) else ''
+                
+                if company and round_num:
+                    holdings_data.append({
+                        'company': company,
+                        'round': round_num,
+                        'keyword': f"{company}{round_num}"
+                    })
+            print(f"✅ Successfully read {len(holdings_data)} company+round combinations from Excel file")
+            return holdings_data
+        else:
+            # Fallback: just company names without rounds
+            holdings = df['기업명'].dropna().tolist()        
+            holdings = [str(company).strip() for company in holdings if str(company).strip()]
+            print(f"✅ Successfully read {len(holdings)} companies from Excel file (no rounds)")
+            return holdings
+    except Exception as e: 
+        print(f"❌ Error reading Excel file: {e}")
+        return []
 
 def update_system_constants_with_excel(excel_path=None):
     try:

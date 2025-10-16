@@ -10,56 +10,52 @@
     "saved_json_prc": "resources/database_prc.json"
   },
   "selectors": {
-    "company_input_selector": "#AKCKwd",
-    "from_date_selector": "input[name='fromDate']",
-    "to_date_selector": "input[name='toDate']",
-    "keyword_input_selector": "#reportNmTemp",
-    "reset_selector": "#bfrDsclsType",
-    "first_idx_selector": "#main-contents > section.scrarea.type-00 > table > tbody > tr.first.active > td.first.txc",
-    "iframe_selector": "iframe[name='docViewFrm']",
-    "next_page_selector": "#main-contents > section.paging-group > div.paging.type-00 > a.next",
-    "result_row_selector": "table.list.type-00",
-    "search_button_selector": "#searchForm > section.search-group.type-00 > div > div.btn-group.type-bt > a.btn-sprite.type-00.vmiddle.search-btn",
-    "table_selector": "table, iframe"
+    "search_button_selector": "#bd_input2_image1",
+    "company_input_selector": "#search_string",
+    "company_search_selector": "#image2",
+    "popup_selector": "#visDiv",
+    "popup_iframe": "#iframeIsin",
+    "from_date_selector": "#inputCalendar1_input",
+    "to_date_selector": "#inputCalendar2_input"
   },
   "timing": {
-    "buffer_time": 0.4,
-    "long_loadtime": 3,
-    "short_loadtime": 1.5,
+    "buffer_time": 0.9,
+    "long_loadtime": 5,
+    "short_loadtime": 3,
     "waitcount": 7,
     "timeout": 1
   },
   "urls": {
-    "details_url": "https://kind.krx.co.kr/disclosure/details.do?method=searchDetailsMain#viewer"
+    "details_url": "https://seibro.or.kr/websquare/control.jsp?w2xPath=/IPORTAL/user/bond/BIP_CNTS03024V.xml&menuNo=416"
   },
   "others": {},
   "holdings": {
     "holdings": [
-      "DB하이텍",
-      "국도화학",
-      "녹십자엠에스",
-      "대원전선",
-      "드림씨아이에스",
-      "SKAI",
-      "삼기에너지솔루션즈",
-      "삼호개발",
-      "상아프론테크",
-      "서울식품공업",
-      "선익시스템",
-      "선익시스템",
-      "성일하이텍",
-      "에스엠씨지",
-      "에스오에스랩",
-      "에스티팜",
-      "에이럭스",
-      "이녹스",
-      "컨텍",
-      "KH바텍",
-      "쿠쿠홀딩스",
-      "테스",
-      "피아이이",
-      "한국석유공업",
-      "흥국에프엔비"
+      {
+        "company": "에스티팜",
+        "round": "2",
+        "keyword": "에스티팜2"
+      },
+      {
+        "company": "비트나인",
+        "round": "2",
+        "keyword": "비트나인2"
+      },
+      {
+        "company": "녹십자엠에스",
+        "round": "5",
+        "keyword": "녹십자엠에스5"
+      },
+      {
+        "company": "선익시스템",
+        "round": "1",
+        "keyword": "선익시스템1"
+      },
+      {
+        "company": "선익시스템",
+        "round": "2",
+        "keyword": "선익시스템2"
+      }
     ]
   }
 }
