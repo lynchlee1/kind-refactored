@@ -167,11 +167,9 @@ def fmtkey(key):
     if idx!=-1: key=key[:idx]
     return key
 
-def run_scrape_conv(config, url = get("details_url")):
+def run_scrape_conv(scraper, config, url = get("details_url")):
     print(f"\nStarting scrape for company: {config['company']}")
     try:
-        scraper = SCRAPER(config, headless=config.get("headless", False), display=config.get("display", False))
-        scraper.setup()
         # 1. Navigate to the main page
         scraper.driver.get(url)
         time.sleep(get("buffer_time"))
@@ -300,11 +298,9 @@ def run_scrape_conv(config, url = get("details_url")):
                 except Exception: break
             except Exception: break
         return all_rows_dicts
-    finally:
-        try:
-            scraper.cleanup()
-        except Exception:
-            pass
+    except Exception as e:
+        print(f"Error scraping {config['company']}: {e}")
+        return []
 
 from export_results import read_list_titles, save_excel, clear_excel
 
@@ -323,12 +319,21 @@ if __name__ == "__main__":
     if not excel:
         print("No companies found")
         exit()
-    for item in excel:
-        config = base_config.copy()
-        config["company"] = item[1]
-        config["keyword"] = item[0]
-        rows = run_scrape_conv(config, get("details_url"))
-        save_excel(rows, sheet_name="DB")
-        rows = run_scrape_conv(config, get("prc_url"))
-        save_excel(rows, sheet_name="EX")
-        print(f"Saved to: results.xlsx")
+    
+    # Create a single scraper instance for all companies
+    scraper = SCRAPER(base_config, headless=base_config.get("headless", False), display=base_config.get("display", False))
+    scraper.setup()
+    
+    try:
+        for item in excel:
+            config = base_config.copy()
+            config["company"] = item[1]
+            config["keyword"] = item[0]
+            rows = run_scrape_conv(scraper, config, get("details_url"))
+            save_excel(rows, sheet_name="DB")
+            rows = run_scrape_conv(scraper, config, get("prc_url"))
+            save_excel(rows, sheet_name="EX")
+            print(f"Saved to: results.xlsx")
+    finally:
+        # Clean up the single driver instance
+        scraper.cleanup()
