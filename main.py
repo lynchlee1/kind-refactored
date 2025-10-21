@@ -1,4 +1,7 @@
 import time
+import tkinter as tk
+from tkinter import ttk, scrolledtext
+import threading
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -274,7 +277,6 @@ def run_scrape_conv(scraper, config, url = get("details_url"), is_first_company_
                         """,
                         cells
                     )
-                    print("values", values, "\n")
                     if not values or values[0] == "": 
                         continue
                     row_dict = {}
@@ -294,12 +296,14 @@ def run_scrape_conv(scraper, config, url = get("details_url"), is_first_company_
                             row_dict["prv_prc"] = float(values[5].replace(',', '')) if values[5] else None
                             row_dict["cur_prc"] = float(values[6].replace(',', '')) if values[6] else None
                     except Exception as e: 
-                        print(f"Error creating row_dict: {e}")
-                        print(f"Values: {values}")
                         pass
                     data_dicts.append(row_dict)
                 all_rows_dicts.extend(data_dicts)
                 previous_page_key = page_key
+                # Check if current page is full (15 rows) - if not, no next page
+                if len(rows) < 15:
+                    break
+                    
                 try:
                     scraper._click_button("#gridPaging_next_btn")
                     time.sleep(get("short_loadtime"))
@@ -308,63 +312,225 @@ def run_scrape_conv(scraper, config, url = get("details_url"), is_first_company_
             except Exception: break
         return all_rows_dicts
     except Exception as e:
-        print(f"Error scraping {config['company']}: {e}")
         return []
 
 from export_results import read_list_titles, save_excel, clear_excel
 
+class KINDScraperGUI:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("SEIBRO Scraper")
+        self.root.geometry("600x500")
+        
+        # Create GUI elements
+        self.setup_gui()
+        
+        # Variables for tracking
+        self.is_running = False
+        self.scraper = None
+        
+    def setup_gui(self):
+        # Title
+        title_label = tk.Label(self.root, text="SEIBRO Scraper", font=("Arial", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Status frame
+        status_frame = tk.Frame(self.root)
+        status_frame.pack(fill="x", padx=10, pady=5)
+        
+        tk.Label(status_frame, text="Status:", font=("Arial", 10, "bold")).pack(side="left")
+        self.status_label = tk.Label(status_frame, text="Ready", fg="blue")
+        self.status_label.pack(side="left", padx=5)
+        
+        # Progress frame
+        progress_frame = tk.Frame(self.root)
+        progress_frame.pack(fill="x", padx=10, pady=5)
+        
+        tk.Label(progress_frame, text="Progress:", font=("Arial", 10, "bold")).pack(side="left")
+        self.progress_var = tk.StringVar(value="0/0")
+        self.progress_label = tk.Label(progress_frame, textvariable=self.progress_var)
+        self.progress_label.pack(side="left", padx=5)
+        
+        # Progress bar
+        self.progress_bar = ttk.Progressbar(self.root, mode='determinate')
+        self.progress_bar.pack(fill="x", padx=10, pady=5)
+        
+        # Log area
+        tk.Label(self.root, text="Log:", font=("Arial", 10, "bold")).pack(anchor="w", padx=10, pady=(10,0))
+        self.log_text = scrolledtext.ScrolledText(self.root, height=15, width=70)
+        self.log_text.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        # Button frame
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.start_button = tk.Button(button_frame, text="Start Scraping", command=self.start_scraping, 
+                                    bg="green", fg="white", font=("Arial", 12, "bold"))
+        self.start_button.pack(side="left", padx=5)
+        
+        self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_scraping, 
+                                   bg="red", fg="white", font=("Arial", 12, "bold"), state="disabled")
+        self.stop_button.pack(side="left", padx=5)
+        
+        self.clear_button = tk.Button(button_frame, text="Clear Log", command=self.clear_log)
+        self.clear_button.pack(side="right", padx=5)
+        
+    def log(self, message):
+        """Add message to log area"""
+        self.log_text.insert(tk.END, f"{time.strftime('%H:%M:%S')} - {message}\n")
+        self.log_text.see(tk.END)
+        self.root.update_idletasks()
+        
+    def update_status(self, status, color="blue"):
+        """Update status label"""
+        self.status_label.config(text=status, fg=color)
+        self.root.update_idletasks()
+        
+    def update_progress(self, current, total):
+        """Update progress bar and label"""
+        self.progress_var.set(f"{current}/{total}")
+        if total > 0:
+            self.progress_bar['value'] = (current / total) * 100
+        self.root.update_idletasks()
+        
+    def clear_log(self):
+        """Clear log area"""
+        self.log_text.delete(1.0, tk.END)
+        
+    def start_scraping(self):
+        """Start scraping in a separate thread"""
+        if self.is_running:
+            return
+            
+        self.is_running = True
+        self.start_button.config(state="disabled")
+        self.stop_button.config(state="normal")
+        self.clear_log()
+        
+        # Start scraping in a separate thread
+        thread = threading.Thread(target=self.run_scraping)
+        thread.daemon = True
+        thread.start()
+        
+    def stop_scraping(self):
+        """Stop scraping"""
+        self.is_running = False
+        self.update_status("Stopping...", "orange")
+        self.log("Stopping scraper...")
+        
+    def run_scraping(self):
+        """Main scraping logic"""
+        try:
+            self.log("세이브로 데이터 다운로드를 시작합니다.")
+            self.update_status("준비 중...", "blue")
+            
+            # Clear Excel sheets
+            self.log("엑셀을 준비하는 중...")
+            clear_excel(sheet_name="DB")
+            clear_excel(sheet_name="EX")
+            
+            # Read company list
+            self.log("회사 목록 읽는 중...")
+            excel = read_list_titles()
+            if not excel:
+                self.log("엑셀 파일에 기업이 없습니다.")
+                self.update_status("기업이 없습니다.", "red")
+                return
+                
+            self.log(f"{len(excel)}개 기업을 발견했습니다.")
+            
+            # Create scraper
+            base_config = {
+                "from_date": "20210101",
+                "to_date": time.strftime("%Y%m%d"),
+                "headless": True,
+                "display": False,
+            }
+            
+            self.scraper = SCRAPER(base_config, headless=True, display=False)
+            self.scraper.setup()
+            self.log("Chrome 브라우저가 정상적으로 실행되었습니다.")
+            
+            # Process details URL
+            self.update_status("행사내역 데이터를 수집하는 중...", "blue")
+            self.log("행사내역 데이터를 수집하는 중...\n")
+            total_companies = len(excel)
+            
+            for i, item in enumerate(excel):
+                if not self.is_running:
+                    break
+                    
+                self.update_progress(i, total_companies)
+                config = base_config.copy()
+                config["company"] = item[1]
+                config["keyword"] = item[0]
+                is_first = (i == 0)
+                
+                self.log(f"{config['keyword']}의 행사내역 데이터를 수집하는 중... ({i+1}/{total_companies})")
+                rows = run_scrape_conv(self.scraper, config, get("details_url"), is_first_company_for_url=is_first)
+                
+                if rows:
+                    save_excel(rows, sheet_name="DB")
+                    self.log(f"{config['keyword']}의 {len(rows)}개 데이터를 저장했습니다.\n")
+                else:
+                    self.log(f"{config['keyword']}의 해당하는 데이터가 없습니다.\n")
+            
+            if not self.is_running:
+                return
+                
+            # Process PRC URL
+            self.update_status("전환가 변동내역 데이터를 수집하는 중...", "blue")
+            self.log("전환가 변동내역 데이터를 수집하는 중...")
+            
+            for i, item in enumerate(excel):
+                if not self.is_running:
+                    break
+                    
+                self.update_progress(i, total_companies)
+                config = base_config.copy()
+                config["company"] = item[1]
+                config["keyword"] = item[0]
+                is_first = (i == 0)
+                
+                self.log(f"{config['keyword']}의 전환가 변동내역 데이터를 수집하는 중... ({i+1}/{total_companies})")
+                rows = run_scrape_conv(self.scraper, config, get("prc_url"), is_first_company_for_url=is_first)
+                
+                if rows:
+                    save_excel(rows, sheet_name="EX")
+                    self.log(f"{config['keyword']}의 {len(rows)}개 데이터를 저장했습니다.\n")
+                else:
+                    self.log(f"{config['keyword']}의 해당하는 데이터가 없습니다.\n")
+            
+            if not self.is_running:
+                return
+                
+            # Cleanup
+            self.scraper.cleanup()
+            self.log("Chrome 브라우저가 정상적으로 종료되었습니다.")
+            
+            self.update_progress(total_companies, total_companies)
+            self.update_status("Completed!", "green")
+            self.log("모든 데이터가 저장되었습니다.")
+            self.log("데이터 수집이 완료되었습니다.")
+            
+        except Exception as e:
+            self.log(f"Error: {str(e)}")
+            self.update_status("오류가 발생했습니다.", "red")
+        finally:
+            self.is_running = False
+            self.start_button.config(state="normal")
+            self.stop_button.config(state="disabled")
+            if self.scraper:
+                try:
+                    self.scraper.cleanup()
+                except:
+                    pass
+    
+    def run(self):
+        """Start the GUI"""
+        self.root.mainloop()
+
 if __name__ == "__main__":
-    clear_excel(sheet_name="DB")
-    clear_excel(sheet_name="EX")
-    headless_input = input("Run in headless mode? (y/n): ").strip().lower()
-    display_input = input("Run in display mode? (y/n): ").strip().lower()
-    base_config = {
-        "from_date": "20210101",
-        "to_date": time.strftime("%Y%m%d"),
-        "headless": headless_input.startswith('y'),
-        "display": display_input.startswith('y'),
-    }
-    excel = read_list_titles()
-    if not excel:
-        print("No companies found")
-        exit()
-    
-    # Create a single scraper instance for all companies
-    scraper = SCRAPER(base_config, headless=base_config.get("headless", False), display=base_config.get("display", False))
-    scraper.setup()
-    
-    try:
-        # Process all companies for details URL first
-        print("Processing all companies for details URL...")
-        for i, item in enumerate(excel):
-            rows = []
-            config = base_config.copy()
-            config["company"] = item[1]
-            config["keyword"] = item[0]
-            is_first = (i == 0)
-            rows = run_scrape_conv(scraper, config, get("details_url"), is_first_company_for_url=is_first)
-            if rows:
-                save_excel(rows, sheet_name="DB")
-                print(f"Saved data for {config['company']} ({len(rows)} rows)")
-            else:
-                print(f"No data found for {config['company']}")
-        
-        # Then process all companies for prc URL
-        print("Processing all companies for prc URL...")
-        for i, item in enumerate(excel):
-            rows = []
-            config = base_config.copy()
-            config["company"] = item[1]
-            config["keyword"] = item[0]
-            is_first = (i == 0)
-            rows = run_scrape_conv(scraper, config, get("prc_url"), is_first_company_for_url=is_first)
-            if rows:
-                save_excel(rows, sheet_name="EX")
-                print(f"Saved data for {config['company']} ({len(rows)} rows)")
-            else:
-                print(f"No data found for {config['company']}")
-        
-        print(f"All data saved to: results.xlsx")
-    finally:
-        # Clean up the single driver instance
-        scraper.cleanup()
+    # Start the GUI application
+    app = KINDScraperGUI()
+    app.run()
