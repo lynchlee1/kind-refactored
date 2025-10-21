@@ -167,12 +167,13 @@ def fmtkey(key):
     if idx!=-1: key=key[:idx]
     return key
 
-def run_scrape_conv(scraper, config, url = get("details_url")):
+def run_scrape_conv(scraper, config, url = get("details_url"), is_first_company_for_url = True):
     print(f"\nStarting scrape for company: {config['company']}")
     try:
-        # 1. Navigate to the main page
-        scraper.driver.get(url)
-        time.sleep(get("buffer_time"))
+        # 1. Navigate to the main page (only if URL changed or first company)
+        if is_first_company_for_url:
+            scraper.driver.get(url)
+            time.sleep(get("buffer_time"))
 
         # 2. Click the search button
         scraper._click_button(get("search_button_selector"))
@@ -185,29 +186,43 @@ def run_scrape_conv(scraper, config, url = get("details_url")):
         scraper._click_button(get("company_search_selector"), in_iframe=True)
         time.sleep(get("buffer_time"))
 
-        # 5. Switch to the iframe & Find matching items
+        # 5. Switch to the iframe & Find matching items with retry mechanism
         iframe_selector = get("popup_iframe")
         iframe = scraper.driver.find_element(By.CSS_SELECTOR, iframe_selector)
         scraper.driver.switch_to.frame(iframe)
-        container = scraper.driver.find_element(By.CSS_SELECTOR, "#group74 #group118 #isinList")
-        items = container.find_elements(By.CSS_SELECTOR, '[id^="isinList_"][id$="_group178"]')
-        searched_keys = []
-        for _, item in enumerate(items):
-            text = scraper.driver.execute_script("return arguments[0].textContent.trim();", item) or ""
-            searched_keys.append(fmtkey(text))
-        pos = [i for i in range(len(searched_keys)) if searched_keys[i] == fmtkey(config.get("keyword"))]
-        if not pos:
-            print("No matches found")
-            return []
-        if len(pos) > 1:
-            print("Multiple matches found")
-        target = pos[0] # Use first match - error prevention
+        
+        # Keep searching until we find a match
+        while True:
+            try:
+                container = scraper.driver.find_element(By.CSS_SELECTOR, "#group74 #group118 #isinList")
+                items = container.find_elements(By.CSS_SELECTOR, '[id^="isinList_"][id$="_group178"]')
+                searched_keys = []
+                for _, item in enumerate(items):
+                    text = scraper.driver.execute_script("return arguments[0].textContent.trim();", item) or ""
+                    searched_keys.append(fmtkey(text))
+                pos = [i for i in range(len(searched_keys)) if searched_keys[i] == fmtkey(config.get("keyword"))]
+                
+                if pos:
+                    target = pos[0] # Use first match - error prevention
+                    print(f"Found match: position {target}")
+                    if len(pos) > 1:
+                        print("Multiple matches found")
+                    break
+                else:
+                    print("No matches found, retrying...")
+                    time.sleep(get("buffer_time"))
+                    
+            except Exception as e:
+                print(f"Error finding container, retrying... {e}")
+                time.sleep(get("buffer_time"))
+        
         scraper._click_button(f"#isinList_{target}_ISIN_ROW")
         scraper.driver.switch_to.default_content()
 
-        # 6. Fill the dates
-        scraper._fill_dates()
-        time.sleep(get("buffer_time"))
+        # 6. Fill the dates (only if URL changed or first company)
+        if is_first_company_for_url:
+            scraper._fill_dates()
+            time.sleep(get("buffer_time"))
 
         # 7. Click the search button
         scraper._click_button("#image2")
@@ -221,21 +236,6 @@ def run_scrape_conv(scraper, config, url = get("details_url")):
             try:
                 tbody = scraper.driver.find_element(By.CSS_SELECTOR, "#grid1_body_tbody")
                 rows = tbody.find_elements(By.TAG_NAME, "tr")
-                headers = []
-                header_cells = []
-                if rows:
-                    header_cells = rows[0].find_elements(By.TAG_NAME, "th") or rows[0].find_elements(By.TAG_NAME, "td")
-                    headers = scraper.driver.execute_script(
-                        """
-                        var result = [];
-                        for (var i = 0; i < arguments[0].length; i++) {
-                            var v = arguments[0][i].textContent.trim();
-                            result.push(v || `col_${i}`);
-                        }
-                        return result;
-                        """,
-                        header_cells
-                    )
                 page_key = None
                 if rows:
                     first_row_cells = rows[0].find_elements(By.TAG_NAME, "td") or rows[0].find_elements(By.TAG_NAME, "th")
@@ -253,12 +253,17 @@ def run_scrape_conv(scraper, config, url = get("details_url")):
                 if previous_page_key is not None and page_key == previous_page_key: break # same page, stop
 
                 data_dicts = []
-                start_idx = 0
-                for r_idx in range(start_idx, len(rows)):
+                for r_idx in range(0, len(rows)):
                     row = rows[r_idx]
                     cells = row.find_elements(By.TAG_NAME, "td") or row.find_elements(By.TAG_NAME, "th")
                     if not cells:
                         continue
+                    
+                    # Check if first column is visible - if not, skip this row
+                    first_cell = cells[0]
+                    if not first_cell.is_displayed():
+                        continue
+                        
                     values = scraper.driver.execute_script(
                         """
                         var result = [];
@@ -269,7 +274,8 @@ def run_scrape_conv(scraper, config, url = get("details_url")):
                         """,
                         cells
                     )
-                    if values[0] == "": 
+                    print("values", values, "\n")
+                    if not values or values[0] == "": 
                         continue
                     row_dict = {}
                     try:
@@ -278,16 +284,19 @@ def run_scrape_conv(scraper, config, url = get("details_url")):
                             # row_dict["exc_start"] = values[3]
                             # row_dict["exc_end"] = values[4]
                             row_dict["date"] = values[5]
-                            row_dict["exc_amount"] = values[6]
-                            row_dict["exc_shares"] = values[8]
-                            row_dict["exc_price"] = values[9]
+                            row_dict["exc_amount"] = float(values[6].replace(',', '')) if values[6] else None
+                            row_dict["exc_shares"] = float(values[8].replace(',', '')) if values[8] else None
+                            row_dict["exc_price"] = float(values[9].replace(',', '')) if values[9] else None
                             row_dict["listing_date"] = values[10]
                         elif url == get("prc_url"):
                             row_dict["title"] = config.get("keyword")
                             row_dict["date"] = values[1]
-                            row_dict["prv_prc"] = values[5]
-                            row_dict["cur_prc"] = values[6]
-                    except Exception: pass
+                            row_dict["prv_prc"] = float(values[5].replace(',', '')) if values[5] else None
+                            row_dict["cur_prc"] = float(values[6].replace(',', '')) if values[6] else None
+                    except Exception as e: 
+                        print(f"Error creating row_dict: {e}")
+                        print(f"Values: {values}")
+                        pass
                     data_dicts.append(row_dict)
                 all_rows_dicts.extend(data_dicts)
                 previous_page_key = page_key
@@ -325,15 +334,37 @@ if __name__ == "__main__":
     scraper.setup()
     
     try:
-        for item in excel:
+        # Process all companies for details URL first
+        print("Processing all companies for details URL...")
+        for i, item in enumerate(excel):
+            rows = []
             config = base_config.copy()
             config["company"] = item[1]
             config["keyword"] = item[0]
-            rows = run_scrape_conv(scraper, config, get("details_url"))
-            save_excel(rows, sheet_name="DB")
-            rows = run_scrape_conv(scraper, config, get("prc_url"))
-            save_excel(rows, sheet_name="EX")
-            print(f"Saved to: results.xlsx")
+            is_first = (i == 0)
+            rows = run_scrape_conv(scraper, config, get("details_url"), is_first_company_for_url=is_first)
+            if rows:
+                save_excel(rows, sheet_name="DB")
+                print(f"Saved data for {config['company']} ({len(rows)} rows)")
+            else:
+                print(f"No data found for {config['company']}")
+        
+        # Then process all companies for prc URL
+        print("Processing all companies for prc URL...")
+        for i, item in enumerate(excel):
+            rows = []
+            config = base_config.copy()
+            config["company"] = item[1]
+            config["keyword"] = item[0]
+            is_first = (i == 0)
+            rows = run_scrape_conv(scraper, config, get("prc_url"), is_first_company_for_url=is_first)
+            if rows:
+                save_excel(rows, sheet_name="EX")
+                print(f"Saved data for {config['company']} ({len(rows)} rows)")
+            else:
+                print(f"No data found for {config['company']}")
+        
+        print(f"All data saved to: results.xlsx")
     finally:
         # Clean up the single driver instance
         scraper.cleanup()
